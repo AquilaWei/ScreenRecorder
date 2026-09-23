@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.0.2 - 2026-09-24
 
 - **Fix**: the red recording indicator no longer shows up in recordings. It was
   drawn with a per-pixel translucent background, which made Windows reject the
