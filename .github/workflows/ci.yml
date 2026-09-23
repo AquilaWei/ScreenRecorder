@@ -12,10 +12,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        # Oldest and newest supported: clock behaviour differs across versions
+        # (time.monotonic's resolution on Windows changed in 3.13).
+        python: ["3.11", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0  # setup-uv publishes no major-version tag
+        with:
+          python-version: ${{ matrix.python }}
       - name: Install ffmpeg (for integration tests)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
