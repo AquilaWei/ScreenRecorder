@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **New**: a red dot in the system tray while recording. The on-screen circle is
+  hidden from all screen captures, so it is also invisible when you watch the PC
+  through remote desktop (AnyDesk, Chrome Remote Desktop); the tray dot is not,
+  so it shows there - at the cost of appearing in the recorded taskbar. On
+  Windows 10 it starts in the hidden `^` overflow: drag it onto the taskbar once
+
 ## 0.0.2 - 2026-09-24
 
 - **Fix**: the red recording indicator no longer shows up in recordings. It was

@@ -1,4 +1,4 @@
-"""M1 minimal GUI: start/stop, quality preset, save location, red-circle indicator."""
+"""M1 minimal GUI: start/stop, quality preset, save location, red-circle and tray indicators."""
 
 from __future__ import annotations
 
@@ -34,6 +34,7 @@ from screenrec.recorder.spec import (
 from screenrec.recorder.windows import WindowsBackend
 from screenrec.storage import default_filename
 from screenrec.ui.indicator import RecordingIndicator
+from screenrec.ui.tray import RecordingTrayIcon
 
 
 class _CallableWorker(QObject):
@@ -71,6 +72,7 @@ class MainWindow(QWidget):
         self._backend = WindowsBackend()
         self._controller = RecordingController()
         self._indicator = RecordingIndicator()
+        self._tray_icon = RecordingTrayIcon()
         self._pending_spec: RecordingSpec | None = None
         self._active_thread: QThread | None = None
         self._active_worker: _CallableWorker | None = None
@@ -173,6 +175,7 @@ class MainWindow(QWidget):
             geometry = primary_screen.geometry()
             self._indicator.move(geometry.right() - 40, geometry.top() + 16)
         self._indicator.show()
+        self._tray_icon.show()
 
         self._start_stop_button.setText("停止錄製")
         status = f"錄製中：{self._pending_spec.output_path.name}"
@@ -185,6 +188,7 @@ class MainWindow(QWidget):
         self._start_stop_button.setEnabled(False)
         self._status_label.setText("停止中…")
         self._indicator.hide()
+        self._tray_icon.hide()
 
         self._run_async(self._stop_and_finalize, self._on_stop_finished)
 

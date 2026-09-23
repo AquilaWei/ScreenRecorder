@@ -19,6 +19,10 @@ for what works today.
 - Records to **MKV** so a crash or power loss doesn't corrupt the file, then
   losslessly remuxes to **MP4** when you stop
 - **Installer** with Start menu / desktop shortcuts — FFmpeg bundled
+- A **red dot in the system tray** while recording — unlike the on-screen circle
+  it also shows through remote desktop (AnyDesk, Chrome Remote Desktop), which
+  hides capture-excluded windows. Windows 10 puts new tray icons in the hidden
+  `^` overflow: drag it onto the taskbar once and Windows remembers
 
 **Planned:** a specific window or a custom region, microphone mixing, choosing
 the monitor, Linux and macOS.
