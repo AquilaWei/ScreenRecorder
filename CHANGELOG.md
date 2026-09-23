@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.1 - unreleased
+## 0.0.1 - 2026-09-24
 
 - Project scaffolding: `pyproject.toml` (uv, ruff, pytest), package layout under
   `src/screenrec/`
