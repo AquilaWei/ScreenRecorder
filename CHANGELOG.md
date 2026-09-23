@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Fix**: the red recording indicator no longer shows up in recordings. It was
+  drawn with a per-pixel translucent background, which made Windows reject the
+  "exclude from capture" request - it now uses a round window with whole-window
+  opacity. If exclusion ever fails, the status line now says so instead of
+  failing silently
+
 ## 0.0.1 - 2026-09-24
 
 - Project scaffolding: `pyproject.toml` (uv, ruff, pytest), package layout under

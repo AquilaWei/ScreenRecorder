@@ -175,7 +175,10 @@ class MainWindow(QWidget):
         self._indicator.show()
 
         self._start_stop_button.setText("停止錄製")
-        self._status_label.setText(f"錄製中：{self._pending_spec.output_path.name}")
+        status = f"錄製中：{self._pending_spec.output_path.name}"
+        if not self._indicator.excluded_from_capture:
+            status += "\n注意：這台電腦無法把紅色圓點排除在錄影之外，它會被錄進去"
+        self._status_label.setText(status)
 
     def _stop_recording(self) -> None:
         self._controller.handle(Event.STOP_REQUESTED)
