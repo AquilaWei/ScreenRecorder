@@ -36,6 +36,12 @@ AUDIO_SAMPLE_RATE = 48_000
 AUDIO_CHANNELS = 2
 STARTUP_TIMEOUT_SEC = 30
 
+# Clock for every audio/video alignment timestamp - all of them must come from
+# this one clock. Not time.monotonic(): before Python 3.13 on Windows that's
+# GetTickCount64 with 15.6ms resolution, coarse enough to misplace whole audio
+# chunks relative to the first video frame (found in CI on Python 3.12).
+audio_clock = time.perf_counter
+
 # ffmpeg's flag for "constant quality" differs per encoder family.
 _QUALITY_FLAG = {
     "libx264": "-crf",
@@ -177,7 +183,7 @@ class FfmpegLogReader:
         for line in self._stream:
             if b"Parsed_showinfo" in line:
                 if self.first_frame_at is None and is_first_frame_line(line):
-                    self.first_frame_at = time.monotonic()
+                    self.first_frame_at = audio_clock()
                     self._first_frame.set()
                 continue
             text = line.decode("utf-8", errors="replace").rstrip()
@@ -318,7 +324,7 @@ class WasapiLoopbackCapture:
 
     def __init__(self, sink, timeline_start: Callable[[], float]) -> None:
         """`timeline_start` blocks until the video timeline's t=0 is known and
-        returns it (time.monotonic() clock)."""
+        returns it (`audio_clock` time)."""
         self._sink = sink
         self._timeline_start = timeline_start
         self._thread: threading.Thread | None = None
@@ -353,7 +359,7 @@ class WasapiLoopbackCapture:
 
     def on_audio(self, in_data, frame_count, time_info, status):
         """PortAudio callback - must return quickly, so it only queues."""
-        self._queue.put((time.monotonic(), in_data))
+        self._queue.put((audio_clock(), in_data))
         return (None, 0)  # 0 == paContinue
 
     def stop(self) -> bool:
@@ -382,7 +388,7 @@ class WasapiLoopbackCapture:
             except queue.Empty:
                 if self._stop_event.is_set():
                     return  # queue fully flushed
-                data = padder.on_idle(time.monotonic())
+                data = padder.on_idle(audio_clock())
                 if data is None:
                     continue
             if not data:
@@ -429,7 +435,7 @@ class WindowsBackend:
                 self._audio_capture = WasapiLoopbackCapture(
                     self._audio_sink,
                     timeline_start=lambda: (
-                        log.wait_first_frame(FIRST_FRAME_TIMEOUT_SEC) or time.monotonic()
+                        log.wait_first_frame(FIRST_FRAME_TIMEOUT_SEC) or audio_clock()
                     ),
                 )
                 self._audio_capture.start()

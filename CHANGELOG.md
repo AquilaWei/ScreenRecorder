@@ -82,4 +82,7 @@
     doesn't have
   - ffmpeg is located as `$SCREENREC_FFMPEG`, then the bundled copy, then
     `PATH`; all ffmpeg children run with `CREATE_NO_WINDOW`
+- A/V alignment timestamps use a high-resolution clock. On Python 3.11/3.12
+  under Windows, `time.monotonic()` only ticks every 15.6ms, which could drop or
+  misplace audio at the start of a recording (found in CI)
 - Not yet implemented: window/region capture, microphone mixing (M2)

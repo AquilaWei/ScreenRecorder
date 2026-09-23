@@ -20,6 +20,7 @@ from screenrec.recorder.windows import (
     FfmpegLogReader,
     SilencePadder,
     WasapiLoopbackCapture,
+    audio_clock,
     build_ffmpeg_args,
     is_first_frame_line,
     silence_chunk,
@@ -146,7 +147,7 @@ def test_on_audio_returns_immediately_while_the_sink_write_is_blocked():
     # Regression test: capture and write used to share one thread, so a blocked
     # write (ffmpeg not reading audio yet) overflowed the device buffer and
     # dropped audio - measured live as audio drifting ~250ms ahead of video.
-    capture = WasapiLoopbackCapture(_SlowSink(delay=0.5), timeline_start=time.monotonic)
+    capture = WasapiLoopbackCapture(_SlowSink(delay=0.5), timeline_start=audio_clock)
     thread = threading.Thread(target=capture._run, args=(4800,))
     thread.start()
     started = time.monotonic()
@@ -161,7 +162,7 @@ def test_on_audio_returns_immediately_while_the_sink_write_is_blocked():
 
 def test_audio_queued_while_the_sink_is_blocked_is_written_in_order():
     sink = _SlowSink(delay=0.2)
-    timeline_start = time.monotonic()  # before any audio arrives
+    timeline_start = audio_clock() - 1.0  # well before any audio arrives
     capture = WasapiLoopbackCapture(sink, timeline_start=lambda: timeline_start)
     thread = threading.Thread(target=capture._run, args=(4800,))
     thread.start()
@@ -174,7 +175,7 @@ def test_audio_queued_while_the_sink_is_blocked_is_written_in_order():
 
 
 def test_on_audio_callback_tells_portaudio_to_continue():
-    capture = WasapiLoopbackCapture(_SlowSink(delay=0), timeline_start=time.monotonic)
+    capture = WasapiLoopbackCapture(_SlowSink(delay=0), timeline_start=audio_clock)
     assert capture.on_audio(b"\x01" * 8, 2, None, 0) == (None, 0)
 
 
@@ -323,3 +324,15 @@ def test_audio_socket_sink_write_fails_once_closed_before_ffmpeg_connected():
     sink.close()
     with pytest.raises(OSError):
         sink.write(b"abc")
+
+
+def test_audio_arrival_timestamps_are_high_resolution():
+    # Regression test: time.monotonic() on Windows before Python 3.13 ticks in
+    # 15.6ms steps, so chunks arriving microseconds apart got equal timestamps
+    # and were misplaced against the first video frame (failed in CI on 3.12).
+    capture = WasapiLoopbackCapture(_SlowSink(delay=0), timeline_start=audio_clock)
+    capture.on_audio(b"\x01" * 8, 2, None, 0)
+    capture.on_audio(b"\x02" * 8, 2, None, 0)
+    first_arrival, _ = capture._queue.get_nowait()
+    second_arrival, _ = capture._queue.get_nowait()
+    assert second_arrival > first_arrival
