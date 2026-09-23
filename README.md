@@ -32,6 +32,20 @@ uv sync
 uv run screenrec
 ```
 
+## Building the Windows installer
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+```
+
+Produces `dist\ScreenRec\ScreenRec.exe` (PyInstaller one-folder build with the
+FFmpeg found on `PATH` bundled under `ffmpeg\`) and, if
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) is installed,
+`dist\ScreenRec-Setup-<version>.exe` — a per-user installer (no admin rights)
+with Start menu / optional desktop shortcuts and an uninstaller. Pass
+`-FfmpegPath` to bundle a specific `ffmpeg.exe`. The bundled FFmpeg is
+GPL-licensed; its license is shipped next to it.
+
 ## Development
 
 ```bash
