@@ -1,0 +1,39 @@
+[project]
+name = "screenrec"
+version = "0.0.1"
+description = "Cross-platform screen recorder with system audio, region/window capture, and a non-recorded on-screen indicator."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "PySide6>=6.7",
+    "platformdirs>=4.0",
+    "tomli-w>=1.0",
+    "pyaudiowpatch>=0.2.12.7; sys_platform == 'win32'",
+]
+
+[project.scripts]
+screenrec = "screenrec.__main__:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/screenrec"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
