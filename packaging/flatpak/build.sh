@@ -4,9 +4,10 @@
 #   packaging/flatpak/build.sh              # build, install --user, bundle
 #   packaging/flatpak/build.sh --no-bundle  # build and install only
 #
-# Output: build/flatpak/ScreenRec.flatpak. Needs flatpak-builder as a Flatpak
-# (flatpak install flathub org.flatpak.Builder) and the runtime, SDK and base
-# app named in the manifest; --install-deps-from pulls those in.
+# Output: build/flatpak/ScreenRec.flatpak. Needs flatpak-builder - installed
+# natively (as in CI's Flathub container) or as a Flatpak (flatpak install
+# flathub org.flatpak.Builder). The runtime, SDK and base app named in the
+# manifest are pulled in by --install-deps-from.
 #
 # Everything lands under build/, which the manifest's `dir` source skips -
 # a build directory anywhere else in the tree would copy itself.
@@ -20,8 +21,14 @@ OUT="$REPO/build/flatpak"
 bundle=1
 if [ "${1:-}" = "--no-bundle" ]; then bundle=0; shift; fi
 
+if command -v flatpak-builder >/dev/null; then
+    builder=(flatpak-builder)
+else
+    builder=(flatpak run org.flatpak.Builder)
+fi
+
 mkdir -p "$OUT"
-flatpak run org.flatpak.Builder \
+"${builder[@]}" \
     --force-clean --user --install \
     --install-deps-from=flathub \
     --state-dir "$OUT/state" \

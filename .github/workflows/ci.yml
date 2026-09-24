@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # release.yml runs this first: nothing is published unless the tests pass.
+  workflow_call:
 
 jobs:
   test:

@@ -1,0 +1,73 @@
+name: Release
+
+# Pushing a version tag (vX.Y.Z) builds the Linux Flatpak and publishes it as a
+# GitHub Release, with release notes taken from that version's CHANGELOG
+# section and SHA256 checksums. Run it by hand (Actions > Release > Run
+# workflow) to build the Flatpak without publishing anything.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  flatpak:
+    needs: test
+    runs-on: ubuntu-latest
+    # Flathub's own build image: flatpak-builder and the KDE 6.11 runtime/SDK
+    # the manifest uses. --privileged because bubblewrap sandboxes each step.
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.11
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag matches pyproject.toml
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "tag $GITHUB_REF_NAME but pyproject.toml says $version"; exit 1; }
+      # build.sh installs per user, and the image only has a system remote.
+      - run: flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      # No /dev/fuse in the container, so no rofiles-fuse.
+      - run: packaging/flatpak/build.sh --disable-rofiles-fuse
+      - run: |
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          mv build/flatpak/ScreenRec.flatpak "ScreenRec-$version.flatpak"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flatpak
+          path: ScreenRec-*.flatpak
+          if-no-files-found: error
+
+  publish:
+    needs: flatpak
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: flatpak
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v heading="## $version - " \
+            'index($0, heading) == 1 {found = 1; next} found && /^## / {exit} found' \
+            CHANGELOG.md > notes.md
+          test -s notes.md || { echo "no CHANGELOG section for $version"; exit 1; }
+      - run: sha256sum ScreenRec-*.flatpak > SHA256SUMS
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # x.y.0 has passed acceptance on real hardware; other patch versions
+          # are test releases (see CHANGELOG), so mark them as pre-releases.
+          prerelease=$([ "${version##*.}" = 0 ] || echo --prerelease)
+          gh release create "$GITHUB_REF_NAME" ScreenRec-*.flatpak SHA256SUMS \
+            --title "ScreenRec $version" --notes-file notes.md $prerelease
