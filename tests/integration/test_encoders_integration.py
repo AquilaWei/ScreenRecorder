@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from screenrec.recorder.encoders import probe_encoder
+from screenrec.recorder.encoders import choose_encoder, probe_encoder
 from screenrec.recorder.spec import VideoCodec
-from screenrec.recorder.windows import choose_encoder
 
 
 def test_choose_encoder_returns_an_encoder_that_really_encodes(

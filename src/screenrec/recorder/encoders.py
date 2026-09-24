@@ -12,7 +12,7 @@ import subprocess
 from collections.abc import Callable
 
 from screenrec.recorder.ffmpeg_exe import NO_WINDOW
-from screenrec.recorder.spec import VideoCodec
+from screenrec.recorder.spec import RecordingSpec, VideoCodec
 
 _FALLBACK_CHAINS: dict[VideoCodec, tuple[str, ...]] = {
     VideoCodec.H264: ("h264_nvenc", "h264_qsv", "h264_amf", "libx264", "libopenh264"),
@@ -102,3 +102,11 @@ def select_working_encoder(
         if probe(name):
             return name
     raise RuntimeError(f"no working encoder for {codec.value}; tried {', '.join(tried)}")
+
+
+def choose_encoder(spec: RecordingSpec, ffmpeg_path: str = "ffmpeg") -> str:
+    """The best encoder for `spec.codec` that really works with this ffmpeg."""
+    available = list_available_encoders(ffmpeg_path)
+    return select_working_encoder(
+        available, spec.codec, probe=lambda name: probe_encoder(name, ffmpeg_path)
+    )

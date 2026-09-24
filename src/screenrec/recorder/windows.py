@@ -23,11 +23,7 @@ from collections.abc import Callable
 from screenrec import power
 from screenrec.presets import get_encoding_params
 from screenrec.recorder.controller import Event
-from screenrec.recorder.encoders import (
-    list_available_encoders,
-    probe_encoder,
-    select_working_encoder,
-)
+from screenrec.recorder.encoders import choose_encoder
 from screenrec.recorder.ffmpeg_common import encoding_args, wait_for_output
 from screenrec.recorder.ffmpeg_exe import NO_WINDOW, find_ffmpeg
 from screenrec.recorder.spec import AudioSource, CaptureMode, RecordingSpec, validate
@@ -82,13 +78,6 @@ def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str, audio_url: str | 
 
     args += encoding_args(params, video_encoder, audio_url is not None, spec.output_path)
     return args
-
-
-def choose_encoder(spec: RecordingSpec, ffmpeg_path: str = "ffmpeg") -> str:
-    available = list_available_encoders(ffmpeg_path)
-    return select_working_encoder(
-        available, spec.codec, probe=lambda name: probe_encoder(name, ffmpeg_path)
-    )
 
 
 def silence_chunk(chunk_frames: int) -> bytes:
