@@ -27,7 +27,7 @@ def _make_test_mkv(
             "-i",
             f"sine=duration={audio_sec or duration_sec}",
             "-c:v",
-            "libx264",
+            "mpeg4",  # built into every ffmpeg; libx264 is missing from e.g. Fedora's
             "-c:a",
             "aac",
             str(path),
@@ -122,7 +122,7 @@ def test_forcibly_killed_mkv_recording_is_still_readable(
             "-i",
             "testsrc=size=320x240:rate=10",
             "-c:v",
-            "libx264",
+            "mpeg4",  # built into every ffmpeg; libx264 is missing from e.g. Fedora's
             str(mkv_path),
         ]
     )
