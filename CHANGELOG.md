@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **New (test version)**: Linux. Records the full screen with system audio through
+  the desktop's screen-sharing dialog (xdg-desktop-portal + PipeWire), so it works
+  on Wayland. The first recording after starting the app asks which screen to
+  share; later ones reuse the choice. Audio stays in sync with the video. Needs
+  GStreamer's PipeWire plugin - see the README. Only the tray dot shows while
+  recording: Linux can't keep the on-screen circle out of the video
+- **New**: when ffmpeg has no x264 (e.g. Fedora's own ffmpeg), H.264 falls back
+  to OpenH264 instead of failing to start
+
 ## 0.1.0 - 2026-09-24
 
 - **M1 done** and accepted on a real Windows 10 machine: full-screen recording

@@ -21,9 +21,11 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0  # setup-uv publishes no major-version tag
         with:
           python-version: ${{ matrix.python }}
-      - name: Install ffmpeg (for integration tests)
+      - name: Install ffmpeg and GStreamer (for integration tests)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: >-
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good
       - name: Install ffmpeg (for integration tests)
         if: runner.os == 'Windows'
         run: choco install ffmpeg -y

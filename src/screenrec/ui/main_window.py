@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from screenrec.recorder.controller import Event, RecordingController, State
 from screenrec.recorder.finalize import remux_to_mp4
+from screenrec.recorder.linux import LinuxBackend
 from screenrec.recorder.spec import (
     AudioSource,
     CaptureMode,
@@ -33,7 +35,7 @@ from screenrec.recorder.spec import (
 )
 from screenrec.recorder.windows import WindowsBackend
 from screenrec.storage import default_filename
-from screenrec.ui.indicator import RecordingIndicator
+from screenrec.ui.indicator import CAN_EXCLUDE_FROM_CAPTURE, RecordingIndicator
 from screenrec.ui.tray import RecordingTrayIcon
 
 
@@ -69,7 +71,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("ScreenRec")
 
-        self._backend = WindowsBackend()
+        self._backend = LinuxBackend() if sys.platform.startswith("linux") else WindowsBackend()
         self._controller = RecordingController()
         self._indicator = RecordingIndicator()
         self._tray_icon = RecordingTrayIcon()
@@ -170,16 +172,17 @@ class MainWindow(QWidget):
             return
         self._controller.handle(Event.BACKEND_STARTED)
 
-        primary_screen = QGuiApplication.primaryScreen()
-        if primary_screen is not None:
-            geometry = primary_screen.geometry()
-            self._indicator.move(geometry.right() - 40, geometry.top() + 16)
-        self._indicator.show()
+        if CAN_EXCLUDE_FROM_CAPTURE:
+            primary_screen = QGuiApplication.primaryScreen()
+            if primary_screen is not None:
+                geometry = primary_screen.geometry()
+                self._indicator.move(geometry.right() - 40, geometry.top() + 16)
+            self._indicator.show()
         self._tray_icon.show()
 
         self._start_stop_button.setText("停止錄製")
         status = f"錄製中：{self._pending_spec.output_path.name}"
-        if not self._indicator.excluded_from_capture:
+        if CAN_EXCLUDE_FROM_CAPTURE and not self._indicator.excluded_from_capture:
             status += "\n注意：這台電腦無法把紅色圓點排除在錄影之外，它會被錄進去"
         self._status_label.setText(status)
 

@@ -13,6 +13,10 @@ from PySide6.QtWidgets import QWidget
 
 WDA_EXCLUDEFROMCAPTURE = 0x11
 
+# Only Windows lets a window opt out of screen capture. Elsewhere the circle
+# would end up in the recording, so it isn't shown at all (the tray dot stays).
+CAN_EXCLUDE_FROM_CAPTURE = sys.platform == "win32"
+
 _BLINK_DIM_FACTOR = 0.35
 
 
