@@ -27,10 +27,21 @@ def test_openh264_gets_a_target_bitrate_instead_of_a_quality_flag():
     # OpenH264 has no CRF; given one, ffmpeg ignores it and encodes at its
     # tiny default bitrate.
     args = encoding_args(STANDARD_H264, "libopenh264", has_audio=False, output_path=Path("o.mkv"))
-    assert args[args.index("-b:v") + 1] == "8000k"
+    assert args[args.index("-b:v") + 1] == "6000k"
+    assert args[args.index("-maxrate") + 1] == "8000k"
     assert "-crf" not in args
 
 
 def test_openh264_does_not_get_a_libx264_style_preset():
     args = encoding_args(STANDARD_H264, "libopenh264", has_audio=False, output_path=Path("o.mkv"))
     assert "-preset" not in args
+
+
+def test_qsv_uses_a_capped_variable_bitrate_not_constant_qp():
+    # Regression test: -global_quality put QSV into constant-QP mode, which
+    # ignores -maxrate - measured live at ~125 Mbps on busy 1080p content
+    # against the STANDARD preset's 8 Mbps ceiling.
+    args = encoding_args(STANDARD_H264, "h264_qsv", has_audio=False, output_path=Path("o.mkv"))
+    assert "-global_quality" not in args
+    assert args[args.index("-b:v") + 1] == "6000k"
+    assert args[args.index("-maxrate") + 1] == "8000k"

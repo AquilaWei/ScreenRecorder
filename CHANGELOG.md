@@ -10,6 +10,9 @@
   recording: Linux can't keep the on-screen circle out of the video
 - **New**: when ffmpeg has no x264 (e.g. Fedora's own ffmpeg), H.264 falls back
   to OpenH264 instead of failing to start
+- **Fix**: with Intel Quick Sync (QSV) the quality preset's size limit was
+  ignored - fast-changing content (e.g. a full-screen video) could make the file
+  grow 10x or more. QSV recordings now stay within the preset's bitrate
 
 ## 0.1.0 - 2026-09-24
 

@@ -16,9 +16,13 @@ _QUALITY_FLAG = {
     "libx265": "-crf",
     "h264_nvenc": "-cq",
     "hevc_nvenc": "-cq",
-    "h264_qsv": "-global_quality",
-    "hevc_qsv": "-global_quality",
 }
+
+# Encoders without a constant-quality mode that honours -maxrate get a
+# variable bitrate instead. OpenH264 has no quality mode at all. QSV's
+# -global_quality selects constant QP, which ignores -maxrate: measured live at
+# ~125 Mbps on busy 1080p content against an 8 Mbps ceiling.
+_BITRATE_TARGET_ENCODERS = {"libopenh264", "h264_qsv", "hevc_qsv"}
 
 # Software encoders only (hardware encoders have their own, differently-named
 # speed/quality tradeoff options). Left unset, libx264/libx265 default to the
@@ -67,20 +71,17 @@ def encoding_args(
 
 
 def _rate_control_args(params: EncodingParams, video_encoder: str) -> list[str]:
-    bufsize = f"{params.max_bitrate_kbps * 2}k"
-    if video_encoder == "libopenh264":
-        # OpenH264 has no constant-quality mode, only a target bitrate; the
-        # preset's ceiling doubles as the target.
-        return ["-b:v", f"{params.max_bitrate_kbps}k", "-bufsize", bufsize]
-    quality_flag = _QUALITY_FLAG.get(video_encoder, "-crf")
-    return [
-        quality_flag,
-        str(params.crf),
+    ceiling = [
         "-maxrate",
         f"{params.max_bitrate_kbps}k",
         "-bufsize",
-        bufsize,
+        f"{params.max_bitrate_kbps * 2}k",
     ]
+    if video_encoder in _BITRATE_TARGET_ENCODERS:
+        # Target below the ceiling: a target equal to -maxrate makes ffmpeg
+        # pick constant bitrate, which spends the full rate on a still screen.
+        return ["-b:v", f"{params.max_bitrate_kbps * 3 // 4}k", *ceiling]
+    return [_QUALITY_FLAG.get(video_encoder, "-crf"), str(params.crf), *ceiling]
 
 
 def wait_for_output(
