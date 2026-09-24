@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 - 2026-09-24
 
 - **New**: Linux records with the graphics card's own encoder (VAAPI) on Intel
   and AMD GPUs, instead of falling back to the much slower software encoding.

@@ -1,6 +1,6 @@
 [project]
 name = "screenrec"
-version = "0.1.1"
+version = "0.1.2"
 description = "Cross-platform screen recorder with system audio, region/window capture, and a non-recorded on-screen indicator."
 readme = "README.md"
 license = "Apache-2.0"
