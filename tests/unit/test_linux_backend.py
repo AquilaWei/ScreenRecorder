@@ -118,21 +118,108 @@ def test_start_warns_the_user_when_the_desktop_wont_keep_the_machine_awake(monke
     # never shows - a long recording could silently end at the next sleep.
     portal = pytest.importorskip("screenrec.recorder.portal")
 
-    class _SessionWithoutInhibit:
-        restore_token = None
-
-        def __init__(self, restore_token):
-            pass
-
-        def open(self):
+    class _PortalWithoutInhibit:
+        def start_cast(self):
             return portal.ScreenStream(fd=-1, node_id=1)
 
         def inhibit_sleep(self, reason):
             raise RuntimeError("no Inhibit portal")
 
-    monkeypatch.setattr(portal, "ScreenCastSession", _SessionWithoutInhibit)
+    monkeypatch.setattr(portal, "ScreenCastPortal", _PortalWithoutInhibit)
     backend = LinuxBackend(ffmpeg_path="ffmpeg")
 
     backend._open_screen()
 
     assert backend.start_warnings == [SLEEP_NOT_INHIBITED_WARNING]
+
+
+class _DesktopBus:
+    """Stands in for the session bus: answers every portal call and request
+    the way KDE does once the user has picked a screen. Records what was sent."""
+
+    unique_name = ":1.42"
+
+    def __init__(self):
+        self.methods_called = []
+        self._last_request = None
+
+    def send_and_get_reply(self, message, timeout=None):
+        import os
+
+        from jeepney import HeaderFields, new_method_return
+
+        member = message.header.fields[HeaderFields.member]
+        self.methods_called.append(member)
+        if member in ("CreateSession", "SelectSources", "Start"):
+            self._last_request = member
+        if member == "Get":  # AvailableCursorModes
+            return new_method_return(message, "v", (("u", 7),))
+        if member == "OpenPipeWireRemote":
+            return new_method_return(message, "h", (_Fd(os.open(os.devnull, os.O_RDONLY)),))
+        if member == "Inhibit":
+            return new_method_return(message, "o", ("/org/freedesktop/portal/desktop/request/i",))
+        return new_method_return(message, "o", ("/org/freedesktop/portal/desktop/request/x",))
+
+    def filter(self, rule):
+        from contextlib import nullcontext
+
+        return nullcontext(None)
+
+    def recv_until_filtered(self, queue, timeout=None):
+        from types import SimpleNamespace
+
+        results = {
+            "CreateSession": {"session_handle": ("s", "/org/freedesktop/portal/desktop/session/s")},
+            "SelectSources": {},
+            "Start": {
+                "streams": ("a(ua{sv})", [(125, {})]),
+                "restore_token": ("s", "token-from-kde"),
+            },
+        }[self._last_request]
+        return SimpleNamespace(body=(0, results))
+
+    def close(self):
+        pass
+
+
+class _Fd:
+    def __init__(self, fd):
+        self._fd = fd
+
+    def to_raw_fd(self):
+        return self._fd
+
+
+@pytest.fixture
+def desktop(monkeypatch):
+    portal = pytest.importorskip("screenrec.recorder.portal")
+    connections = []
+
+    def open_dbus_connection(**kwargs):
+        connections.append(_DesktopBus())
+        return connections[-1]
+
+    monkeypatch.setattr(portal, "open_dbus_connection", open_dbus_connection)
+    return connections
+
+
+def test_later_recordings_reuse_the_bus_connection_that_holds_the_screen_choice(desktop):
+    # Regression test: the portal only honours the remembered screen for the
+    # connection that chose it, and each recording opened a new one - so the
+    # "which screen?" dialog came back every time.
+    backend = LinuxBackend(ffmpeg_path="ffmpeg")
+
+    backend._open_screen()
+    backend._kill()
+    backend._open_screen()
+
+    assert len(desktop) == 1
+
+
+def test_finishing_a_recording_tells_the_desktop_to_stop_sharing_the_screen(desktop):
+    backend = LinuxBackend(ffmpeg_path="ffmpeg")
+    backend._open_screen()
+
+    backend._kill()
+
+    assert desktop[0].methods_called[-2:] == ["Close", "Close"]  # inhibition, then session

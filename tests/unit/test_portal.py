@@ -5,7 +5,7 @@ pytest.importorskip("jeepney")  # Linux-only dependency
 from screenrec.recorder.portal import (  # noqa: E402
     CURSOR_EMBEDDED,
     CURSOR_HIDDEN,
-    ScreenCastSession,
+    ScreenCastPortal,
     choose_cursor_mode,
     first_stream_node,
     request_path,
@@ -67,7 +67,7 @@ class _PortalThatNeverAnswers:
 def test_unanswered_screen_dialog_raises_an_error_that_says_it_timed_out():
     # Regression test: the bare TimeoutError has no message, so the GUI showed
     # "無法透過 xdg-desktop-portal 取得螢幕畫面：" with nothing after the colon.
-    session = ScreenCastSession()
-    session._conn = _PortalThatNeverAnswers()
+    portal = ScreenCastPortal()
+    portal._conn = _PortalThatNeverAnswers()
     with pytest.raises(RuntimeError, match="逾時"):
-        session._request("Start", "osa{sv}", ("/session", ""), {}, timeout=0.1)
+        portal._request("Start", "osa{sv}", ("/session", ""), {}, timeout=0.1)

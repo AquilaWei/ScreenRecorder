@@ -34,7 +34,7 @@ from screenrec.recorder.ffmpeg_exe import find_ffmpeg
 from screenrec.recorder.spec import AudioSource, CaptureMode, RecordingSpec, validate
 
 if TYPE_CHECKING:  # portal needs jeepney, which only Linux installs
-    from screenrec.recorder.portal import ScreenCastSession, ScreenStream
+    from screenrec.recorder.portal import ScreenCastPortal, ScreenStream
 
 AUDIO_SAMPLE_RATE = 48_000
 AUDIO_CHANNELS = 2
@@ -171,10 +171,9 @@ class LinuxBackend:
         self._ffmpeg: subprocess.Popen | None = None
         self._gst_log: StderrTail | None = None
         self._ffmpeg_log: StderrTail | None = None
-        self._session: ScreenCastSession | None = None  # while recording
-        # Lets the desktop skip its "which screen?" dialog after the first
-        # recording (for as long as the app runs).
-        self._restore_token: str | None = None
+        # Kept across recordings so the desktop can skip its "which screen?"
+        # dialog after the first one - see ScreenCastPortal.
+        self._portal: ScreenCastPortal | None = None
         self.start_warnings: list[str] = []
 
     @property
@@ -224,18 +223,18 @@ class LinuxBackend:
         self._kill()
 
     def _open_screen(self) -> ScreenStream:
-        from screenrec.recorder.portal import PortalCancelledError, ScreenCastSession
+        from screenrec.recorder.portal import PortalCancelledError, ScreenCastPortal
 
-        self._session = ScreenCastSession(self._restore_token)
+        if self._portal is None:
+            self._portal = ScreenCastPortal()
         try:
-            stream = self._session.open()
+            stream = self._portal.start_cast()
         except PortalCancelledError:
             raise
         except Exception as exc:
             raise RuntimeError(f"無法透過 xdg-desktop-portal 取得螢幕畫面：{exc}") from exc
-        self._restore_token = self._session.restore_token or self._restore_token
         try:
-            self._session.inhibit_sleep("ScreenRec 錄製中")
+            self._portal.inhibit_sleep("ScreenRec 錄製中")
         except Exception as exc:  # noqa: BLE001 - recording works without it
             self.start_warnings.append(SLEEP_NOT_INHIBITED_WARNING)
             if sys.stderr is not None:
@@ -278,6 +277,5 @@ class LinuxBackend:
                 process.wait(timeout=5)
         self._gst = None
         self._ffmpeg = None
-        if self._session is not None:
-            self._session.close()
-            self._session = None
+        if self._portal is not None:
+            self._portal.end_cast()

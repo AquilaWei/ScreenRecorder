@@ -5,8 +5,7 @@ desktop shows its own "share which screen?" dialog, and the answer is a
 PipeWire stream (an fd plus a node id) that GStreamer's pipewiresrc can read.
 The same D-Bus connection also holds a sleep/idle inhibition for the recording.
 
-Everything lives as long as the D-Bus connection: closing it ends the screen
-cast session and releases the inhibition, so `close()` is the only cleanup.
+The connection outlives each recording on purpose - see ScreenCastPortal.
 """
 
 from __future__ import annotations
@@ -27,6 +26,8 @@ _SCREENCAST = DBusAddress(
 _INHIBIT = DBusAddress(
     _DESKTOP_PATH, bus_name=_DESKTOP_BUS, interface="org.freedesktop.portal.Inhibit"
 )
+_REQUEST_INTERFACE = "org.freedesktop.portal.Request"
+_SESSION_INTERFACE = "org.freedesktop.portal.Session"
 _PROPERTIES = DBusAddress(
     _DESKTOP_PATH, bus_name=_DESKTOP_BUS, interface="org.freedesktop.DBus.Properties"
 )
@@ -53,7 +54,7 @@ class PortalCancelledError(Exception):
 
 @dataclass(frozen=True)
 class ScreenStream:
-    fd: int  # PipeWire remote; owned by ScreenCastSession, closed with it
+    fd: int  # PipeWire remote; owned by ScreenCastPortal, closed by end_cast()
     node_id: int
 
 
@@ -80,39 +81,48 @@ def first_stream_node(start_results: dict) -> int:
     return streams[0][0]
 
 
-class ScreenCastSession:
-    """One screen cast: asks the desktop for a screen and keeps it shared until
-    `close()`.
+class ScreenCastPortal:
+    """The app's line to the desktop's screen-cast portal: shares a screen for
+    each recording (`start_cast()` .. `end_cast()`) over one D-Bus connection.
+
+    Keep one instance for the app's lifetime: the portal remembers the chosen
+    screen (PERSIST_WHILE_RUNNING) only for the connection that chose it, and
+    forgets it when that connection closes - a connection per recording
+    brought the "which screen?" dialog back every time (found live on KDE).
 
     Blocking, including a wait of up to several minutes for the user's choice
     in the desktop's dialog - call from a worker thread, never the GUI thread.
     """
 
-    def __init__(self, restore_token: str | None = None) -> None:
-        """`restore_token` from a previous session's `restore_token` skips the
-        dialog if the desktop still honours it."""
+    def __init__(self) -> None:
         self._conn: DBusConnection | None = None
+        self._session_handle: str | None = None  # while a screen is shared
+        self._inhibit_handle: str | None = None
         self._stream: ScreenStream | None = None
-        self._pending_restore_token = restore_token
+        # Hands the previous choice to the next start_cast(); the portal issues
+        # a new token each time.
         self.restore_token: str | None = None
 
-    def open(self) -> ScreenStream:
-        """Ask for a screen. Raises PortalCancelledError if the user declines,
+    def start_cast(self) -> ScreenStream:
+        """Ask for a screen - without a dialog if the desktop still remembers
+        the last choice. Raises PortalCancelledError if the user declines,
         RuntimeError if the portal fails, and jeepney/OS errors if there's no
         session bus or no portal at all."""
-        self._conn = open_dbus_connection(bus="SESSION", enable_fds=True)
+        if self._conn is None:
+            self._conn = open_dbus_connection(bus="SESSION", enable_fds=True)
         try:
             session = self._request(
                 "CreateSession", "a{sv}", (), {"session_handle_token": ("s", _new_token())}
             )["session_handle"][1]
+            self._session_handle = session
             select_options = {
                 "types": ("u", SOURCE_MONITOR),
                 "multiple": ("b", False),
                 "cursor_mode": ("u", choose_cursor_mode(self._cursor_modes())),
                 "persist_mode": ("u", PERSIST_WHILE_RUNNING),
             }
-            if self._pending_restore_token:
-                select_options["restore_token"] = ("s", self._pending_restore_token)
+            if self.restore_token:
+                select_options["restore_token"] = ("s", self.restore_token)
             self._request("SelectSources", "oa{sv}", (session,), select_options)
             results = self._request(
                 "Start", "osa{sv}", (session, ""), {}, timeout=_USER_CHOICE_TIMEOUT_SEC
@@ -122,30 +132,53 @@ class ScreenCastSession:
             (fd,) = self._call(_SCREENCAST, "OpenPipeWireRemote", "oa{sv}", (session, {}))
             self._stream = ScreenStream(fd=fd.to_raw_fd(), node_id=node_id)
         except BaseException:
-            self.close()
+            self.end_cast()
             raise
         return self._stream
 
     def inhibit_sleep(self, reason: str) -> None:
-        """Keep the machine awake and the screen on until `close()`. Must follow
-        `open()` (it reuses its connection). Best effort: a desktop without the
-        Inhibit portal raises DBusErrorResponse and recording can go on without it.
+        """Keep the machine awake and the screen on until `end_cast()`. Must
+        follow `start_cast()`. Best effort: a desktop without the Inhibit portal
+        raises DBusErrorResponse and recording can go on without it.
 
         NOTE: unlike the ScreenCast calls, Inhibit sends no Response signal - the
-        inhibition simply lasts as long as its request object, i.e. our connection.
+        inhibition simply lasts until its request object is closed.
         """
-        self._call(
+        (self._inhibit_handle,) = self._call(
             _INHIBIT,
             "Inhibit",
             "sua{sv}",
             ("", INHIBIT_SUSPEND | INHIBIT_IDLE, {"reason": ("s", reason)}),
         )
 
-    def close(self) -> None:
-        """End the screen cast and release the inhibition. Safe to call twice."""
+    def end_cast(self) -> None:
+        """Stop sharing the screen and release the inhibition, keeping the
+        connection so the next start_cast() can skip the dialog. Safe to call
+        when nothing is shared. If the portal can't be told, the connection is
+        dropped instead - that ends both too, but forgets the chosen screen."""
         if self._stream is not None:
             os.close(self._stream.fd)
             self._stream = None
+        to_close = [
+            (self._inhibit_handle, _REQUEST_INTERFACE),
+            (self._session_handle, _SESSION_INTERFACE),
+        ]
+        self._inhibit_handle = None
+        self._session_handle = None
+        try:
+            for handle, interface in to_close:
+                if handle is not None:
+                    address = DBusAddress(handle, bus_name=_DESKTOP_BUS, interface=interface)
+                    self._call(address, "Close", "", ())
+        except Exception:  # noqa: BLE001 - disconnecting ends the cast as well
+            self._disconnect()
+
+    def close(self) -> None:
+        """End any cast and disconnect from the portal. Safe to call twice."""
+        self.end_cast()
+        self._disconnect()
+
+    def _disconnect(self) -> None:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
@@ -180,15 +213,19 @@ class ScreenCastSession:
             member="Response",
             path=request_path(self._conn.unique_name, token),
         )
-        Proxy(message_bus, self._conn).AddMatch(rule)
+        bus = Proxy(message_bus, self._conn)
+        bus.AddMatch(rule)
         options = {**options, "handle_token": ("s", token)}
-        with self._conn.filter(rule) as responses:
-            self._call(_SCREENCAST, method, signature, (*args, options))
-            try:
+        try:
+            with self._conn.filter(rule) as responses:
+                self._call(_SCREENCAST, method, signature, (*args, options))
                 response = self._conn.recv_until_filtered(responses, timeout=timeout)
-            except TimeoutError:
-                raise RuntimeError(f"等候桌面回應逾時（{method}，{timeout:g} 秒）") from None
-            code, results = response.body
+        except TimeoutError:
+            raise RuntimeError(f"等候桌面回應逾時（{method}，{timeout:g} 秒）") from None
+        finally:
+            # The connection lives on, so don't let match rules pile up on the bus.
+            bus.RemoveMatch(rule)
+        code, results = response.body
         if code == RESPONSE_CANCELLED:
             raise PortalCancelledError("已取消選擇要錄製的螢幕")
         if code != RESPONSE_OK:
