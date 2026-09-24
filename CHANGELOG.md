@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0 - 2026-09-24
+
+- **M1 done** and accepted on a real Windows 10 machine: full-screen recording
+  with system audio kept in sync, quality presets, crash-safe MKV recording
+  saved as MP4, a Windows installer with FFmpeg bundled, and recording
+  indicators (an on-screen red circle kept out of the video, plus a tray dot).
+  No code changes since 0.0.3
+
 ## 0.0.3 - 2026-09-24
 
 - **New**: a red dot in the system tray while recording. The on-screen circle is
