@@ -70,6 +70,11 @@ flatpak run io.github.AquilaWei.ScreenRecorder
 After that it's in your application menu as **ScreenRec**. Recordings are saved
 to `~/Videos` by default.
 
+**Updating:** download the newer `.flatpak` from Releases and run the same
+`flatpak install` command — it replaces the installed version. `flatpak update`
+and software centres won't offer new versions, since ScreenRec is published
+here rather than on Flathub.
+
 **Linux (from source)**
 
 - A desktop with xdg-desktop-portal screen casting (KDE Plasma, GNOME, …) and
