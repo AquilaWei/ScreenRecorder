@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 - 2026-09-24
 
 - **New (test version)**: Linux. Records the full screen with system audio through
   the desktop's screen-sharing dialog (xdg-desktop-portal + PipeWire), so it works
