@@ -8,6 +8,8 @@
 - **New (test version)**: a Flatpak for Linux. It carries its own FFmpeg (with
   x264), GStreamer and Qt, so it installs the same way on any distribution
   instead of needing each one's packages
+- **Licence**: ScreenRec is now open source under Apache-2.0. `NOTICE` lists
+  the licences of FFmpeg, GStreamer, Qt and the other parts it runs on
 
 ## 0.1.1 - 2026-09-24
 
