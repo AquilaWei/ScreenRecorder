@@ -102,3 +102,8 @@ Unit tests run with no external dependencies. Integration tests that invoke a re
 Windows comes first (milestones M1–M4), then Linux (M5, full-screen recording
 already in testing) and macOS (M6). Each milestone lands as a `0.0.x` test release until it's
 been verified on real hardware, then becomes a `0.x.0` release — see `CHANGELOG.md`.
+
+## License
+
+**Apache-2.0** (see `LICENSE`). FFmpeg, GStreamer, Qt for Python and the other
+programs ScreenRecorder runs on keep their own licences; `NOTICE` lists them.

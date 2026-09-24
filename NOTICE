@@ -1,0 +1,26 @@
+ScreenRecorder
+Copyright 2026 AquilaWei
+
+This product includes software developed as part of the ScreenRecorder
+project, licensed under the Apache License, Version 2.0 (see LICENSE).
+
+That licence covers this repository's code. The programs and libraries
+ScreenRecorder runs on keep their own licences:
+
+  Python libraries (installed as dependencies, not in this repository)
+    PySide6 / Shiboken6 (Qt for Python)   LGPL-3.0-only OR GPL-2.0/3.0-only
+    jeepney (Linux)                       MIT
+    platformdirs                          MIT
+    tomli-w                               MIT
+    PyAudioWPatch (Windows)               Apache-2.0
+
+  Programs run as separate processes
+    FFmpeg      LGPL-2.1+ or GPL-2.0+ depending on the build. The Windows
+                installer bundles a GPL build and ships its licence next to it
+                (ffmpeg\LICENSE.txt). On Linux the system's (or the Flatpak
+                runtime's) FFmpeg is used.
+    GStreamer   LGPL-2.1+ (Linux only; the system's or the Flatpak runtime's)
+
+  Encoders reached through FFmpeg, when that FFmpeg build includes them
+    x264 / x265   GPL-2.0+
+    OpenH264      BSD-2-Clause (Cisco's binary carries its own patent licence)
