@@ -81,3 +81,14 @@ def test_select_working_encoder_ignores_probe_for_unavailable_encoders():
 
     select_working_encoder(available, VideoCodec.H264, probe=probe)
     assert probed == ["libx264"]  # h264_nvenc/qsv/amf never probed - not compiled in
+
+
+def test_select_video_encoder_falls_back_to_openh264_without_x264():
+    # Fedora's ffmpeg ships no libx264; OpenH264 is its only software H.264.
+    available = {"h264_vaapi", "libopenh264"}
+    assert select_video_encoder(available, VideoCodec.H264) == "libopenh264"
+
+
+def test_select_video_encoder_prefers_x264_over_openh264():
+    available = {"libx264", "libopenh264"}
+    assert select_video_encoder(available, VideoCodec.H264) == "libx264"

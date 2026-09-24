@@ -1,4 +1,10 @@
-from screenrec.recorder.ffmpeg_common import wait_for_output
+from pathlib import Path
+
+from screenrec.presets import get_encoding_params
+from screenrec.recorder.ffmpeg_common import encoding_args, wait_for_output
+from screenrec.recorder.spec import QualityPreset, VideoCodec
+
+STANDARD_H264 = get_encoding_params(QualityPreset.STANDARD, VideoCodec.H264)
 
 
 def test_wait_for_output_true_once_file_has_content(tmp_path):
@@ -15,3 +21,16 @@ def test_wait_for_output_false_on_timeout_when_ffmpeg_hangs_silently(tmp_path):
     # Regression test: ffmpeg once hung at startup with no error and no output
     # file, leaving the GUI stuck forever.
     assert not wait_for_output(tmp_path / "a.mkv", lambda: True, timeout=0.3, poll_interval=0.05)
+
+
+def test_openh264_gets_a_target_bitrate_instead_of_a_quality_flag():
+    # OpenH264 has no CRF; given one, ffmpeg ignores it and encodes at its
+    # tiny default bitrate.
+    args = encoding_args(STANDARD_H264, "libopenh264", has_audio=False, output_path=Path("o.mkv"))
+    assert args[args.index("-b:v") + 1] == "8000k"
+    assert "-crf" not in args
+
+
+def test_openh264_does_not_get_a_libx264_style_preset():
+    args = encoding_args(STANDARD_H264, "libopenh264", has_audio=False, output_path=Path("o.mkv"))
+    assert "-preset" not in args

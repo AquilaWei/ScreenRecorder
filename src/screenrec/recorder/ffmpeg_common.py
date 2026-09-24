@@ -68,6 +68,10 @@ def encoding_args(
 
 def _rate_control_args(params: EncodingParams, video_encoder: str) -> list[str]:
     bufsize = f"{params.max_bitrate_kbps * 2}k"
+    if video_encoder == "libopenh264":
+        # OpenH264 has no constant-quality mode, only a target bitrate; the
+        # preset's ceiling doubles as the target.
+        return ["-b:v", f"{params.max_bitrate_kbps}k", "-bufsize", bufsize]
     quality_flag = _QUALITY_FLAG.get(video_encoder, "-crf")
     return [
         quality_flag,

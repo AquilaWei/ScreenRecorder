@@ -1,6 +1,8 @@
 """Detect available FFmpeg encoders and pick the best one for a codec.
 
 Fallback order follows the feasibility study: hardware encoders first, software last.
+OpenH264 is the last resort: lower quality per bit than x264, but it's what
+distributions that leave out x264 for patent reasons (e.g. Fedora) ship.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from screenrec.recorder.ffmpeg_exe import NO_WINDOW
 from screenrec.recorder.spec import VideoCodec
 
 _FALLBACK_CHAINS: dict[VideoCodec, tuple[str, ...]] = {
-    VideoCodec.H264: ("h264_nvenc", "h264_qsv", "h264_amf", "libx264"),
+    VideoCodec.H264: ("h264_nvenc", "h264_qsv", "h264_amf", "libx264", "libopenh264"),
     VideoCodec.HEVC: ("hevc_nvenc", "hevc_qsv", "hevc_amf", "libx265"),
 }
 
