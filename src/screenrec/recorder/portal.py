@@ -184,7 +184,11 @@ class ScreenCastSession:
         options = {**options, "handle_token": ("s", token)}
         with self._conn.filter(rule) as responses:
             self._call(_SCREENCAST, method, signature, (*args, options))
-            code, results = self._conn.recv_until_filtered(responses, timeout=timeout).body
+            try:
+                response = self._conn.recv_until_filtered(responses, timeout=timeout)
+            except TimeoutError:
+                raise RuntimeError(f"等候桌面回應逾時（{method}，{timeout:g} 秒）") from None
+            code, results = response.body
         if code == RESPONSE_CANCELLED:
             raise PortalCancelledError("已取消選擇要錄製的螢幕")
         if code != RESPONSE_OK:
