@@ -85,10 +85,21 @@ def test_select_working_encoder_ignores_probe_for_unavailable_encoders():
 
 def test_select_video_encoder_falls_back_to_openh264_without_x264():
     # Fedora's ffmpeg ships no libx264; OpenH264 is its only software H.264.
-    available = {"h264_vaapi", "libopenh264"}
+    available = {"h264_v4l2m2m", "libopenh264"}
     assert select_video_encoder(available, VideoCodec.H264) == "libopenh264"
 
 
 def test_select_video_encoder_prefers_x264_over_openh264():
     available = {"libx264", "libopenh264"}
     assert select_video_encoder(available, VideoCodec.H264) == "libx264"
+
+
+def test_select_video_encoder_prefers_vaapi_over_software():
+    # Linux on Intel/AMD: VAAPI is the hardware path, and a Flatpak's only one.
+    available = {"h264_vaapi", "libx264", "libopenh264"}
+    assert select_video_encoder(available, VideoCodec.H264) == "h264_vaapi"
+
+
+def test_select_video_encoder_prefers_qsv_over_vaapi():
+    available = {"h264_qsv", "h264_vaapi"}
+    assert select_video_encoder(available, VideoCodec.H264) == "h264_qsv"

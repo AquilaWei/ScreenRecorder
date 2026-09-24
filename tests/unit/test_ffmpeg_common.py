@@ -37,6 +37,20 @@ def test_openh264_does_not_get_a_libx264_style_preset():
     assert "-preset" not in args
 
 
+def test_vaapi_uses_a_capped_variable_bitrate():
+    # h264_vaapi has no -crf; the default quality flag would be ignored.
+    args = encoding_args(STANDARD_H264, "h264_vaapi", has_audio=False, output_path=Path("o.mkv"))
+    assert "-crf" not in args
+    assert args[args.index("-b:v") + 1] == "6000k"
+    assert args[args.index("-maxrate") + 1] == "8000k"
+
+
+def test_vaapi_gets_no_pix_fmt_because_its_frames_are_already_on_the_gpu():
+    # -pix_fmt yuv420p would ask ffmpeg to convert the uploaded GPU frames back.
+    args = encoding_args(STANDARD_H264, "h264_vaapi", has_audio=False, output_path=Path("o.mkv"))
+    assert "-pix_fmt" not in args
+
+
 def test_qsv_uses_a_capped_variable_bitrate_not_constant_qp():
     # Regression test: -global_quality put QSV into constant-QP mode, which
     # ignores -maxrate - measured live at ~125 Mbps on busy 1080p content

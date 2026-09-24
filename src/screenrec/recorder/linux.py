@@ -29,7 +29,12 @@ from typing import TYPE_CHECKING
 from screenrec.presets import get_encoding_params
 from screenrec.recorder.controller import Event
 from screenrec.recorder.encoders import choose_encoder
-from screenrec.recorder.ffmpeg_common import encoding_args, wait_for_output
+from screenrec.recorder.ffmpeg_common import (
+    encoding_args,
+    hardware_device_args,
+    upload_filter,
+    wait_for_output,
+)
 from screenrec.recorder.ffmpeg_exe import find_ffmpeg
 from screenrec.recorder.spec import AudioSource, CaptureMode, RecordingSpec, validate
 
@@ -128,9 +133,16 @@ def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str) -> list[str]:
             f"{spec.target.mode.value} capture lands in M2, not yet supported"
         )
     params = get_encoding_params(spec.quality, spec.codec)
-    args = ["-y", "-hide_banner", "-nostats", "-f", "matroska", "-i", "pipe:0"]
+    args = ["-y", "-hide_banner", "-nostats", *hardware_device_args(video_encoder)]
+    args += ["-f", "matroska", "-i", "pipe:0"]
+    filters = []
     if params.scale_height is not None:
-        args += ["-vf", f"scale=-2:{params.scale_height}"]
+        filters.append(f"scale=-2:{params.scale_height}")
+    upload = upload_filter(video_encoder)
+    if upload is not None:  # last: every filter before it works on system memory
+        filters.append(upload)
+    if filters:
+        args += ["-vf", ",".join(filters)]
     has_audio = spec.audio is AudioSource.SYSTEM
     args += encoding_args(params, video_encoder, has_audio, spec.output_path)
     return args

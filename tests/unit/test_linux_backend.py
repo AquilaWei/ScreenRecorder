@@ -85,6 +85,31 @@ def test_ffmpeg_keeps_native_resolution_for_the_high_preset():
     assert "-vf" not in args
 
 
+def test_ffmpeg_opens_the_gpu_before_reading_input_for_vaapi():
+    args = build_ffmpeg_args(_full_screen_spec(), "h264_vaapi")
+    assert args[args.index("-i") - 6 : args.index("-i") - 2] == [
+        "-init_hw_device",
+        "vaapi=va",
+        "-filter_hw_device",
+        "va",
+    ]
+
+
+def test_ffmpeg_scales_before_uploading_frames_to_the_gpu_for_vaapi():
+    args = build_ffmpeg_args(_full_screen_spec(quality=QualityPreset.SAVER), "h264_vaapi")
+    assert args[args.index("-vf") + 1] == "scale=-2:720,format=nv12,hwupload"
+
+
+def test_ffmpeg_uploads_native_resolution_frames_to_the_gpu_for_vaapi():
+    args = build_ffmpeg_args(_full_screen_spec(quality=QualityPreset.HIGH), "h264_vaapi")
+    assert args[args.index("-vf") + 1] == "format=nv12,hwupload"
+
+
+def test_ffmpeg_opens_no_gpu_for_software_encoders():
+    args = build_ffmpeg_args(_full_screen_spec(), "libopenh264")
+    assert "-init_hw_device" not in args
+
+
 def test_ffmpeg_encodes_aac_when_recording_system_audio():
     args = build_ffmpeg_args(_full_screen_spec(audio=AudioSource.SYSTEM), "libopenh264")
     assert "aac" in args

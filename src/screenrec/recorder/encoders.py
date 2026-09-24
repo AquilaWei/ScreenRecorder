@@ -1,8 +1,10 @@
 """Detect available FFmpeg encoders and pick the best one for a codec.
 
 Fallback order follows the feasibility study: hardware encoders first, software last.
-OpenH264 is the last resort: lower quality per bit than x264, but it's what
-distributions that leave out x264 for patent reasons (e.g. Fedora) ship.
+VAAPI comes after the vendor encoders: it is Linux's one path to Intel and AMD
+hardware encoding, and the only one a Flatpak's ffmpeg has. OpenH264 is the
+last resort: lower quality per bit than x264, but it's what distributions that
+leave out x264 for patent reasons (e.g. Fedora) ship.
 """
 
 from __future__ import annotations
@@ -11,12 +13,20 @@ import re
 import subprocess
 from collections.abc import Callable
 
+from screenrec.recorder.ffmpeg_common import hardware_device_args, upload_filter
 from screenrec.recorder.ffmpeg_exe import NO_WINDOW
 from screenrec.recorder.spec import RecordingSpec, VideoCodec
 
 _FALLBACK_CHAINS: dict[VideoCodec, tuple[str, ...]] = {
-    VideoCodec.H264: ("h264_nvenc", "h264_qsv", "h264_amf", "libx264", "libopenh264"),
-    VideoCodec.HEVC: ("hevc_nvenc", "hevc_qsv", "hevc_amf", "libx265"),
+    VideoCodec.H264: (
+        "h264_nvenc",
+        "h264_qsv",
+        "h264_amf",
+        "h264_vaapi",
+        "libx264",
+        "libopenh264",
+    ),
+    VideoCodec.HEVC: ("hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_vaapi", "libx265"),
 }
 
 # `ffmpeg -encoders` lines look like " V..... libx264   <description>" - 6 capability
@@ -62,18 +72,21 @@ def probe_encoder(encoder_name: str, ffmpeg_path: str = "ffmpeg") -> bool:
     NVENC SDK version this ffmpeg build expects. `select_video_encoder` alone
     can't catch that; this does.
     """
+    upload = upload_filter(encoder_name)
     result = subprocess.run(
         [
             ffmpeg_path,
             "-hide_banner",
             "-loglevel",
             "error",
+            *hardware_device_args(encoder_name),
             "-f",
             "lavfi",
             "-i",
             "testsrc=size=64x64:rate=1",
             "-frames:v",
             "1",
+            *(["-vf", upload] if upload else []),
             "-c:v",
             encoder_name,
             "-f",

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **New**: Linux records with the graphics card's own encoder (VAAPI) on Intel
+  and AMD GPUs, instead of falling back to the much slower software encoding.
+  Quick Sync and NVIDIA are still preferred where they work
+
 ## 0.1.1 - 2026-09-24
 
 - **New (test version)**: Linux. Records the full screen with system audio through

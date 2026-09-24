@@ -21,8 +21,13 @@ _QUALITY_FLAG = {
 # Encoders without a constant-quality mode that honours -maxrate get a
 # variable bitrate instead. OpenH264 has no quality mode at all. QSV's
 # -global_quality selects constant QP, which ignores -maxrate: measured live at
-# ~125 Mbps on busy 1080p content against an 8 Mbps ceiling.
-_BITRATE_TARGET_ENCODERS = {"libopenh264", "h264_qsv", "hevc_qsv"}
+# ~125 Mbps on busy 1080p content against an 8 Mbps ceiling. VAAPI takes no
+# -crf, and with a bitrate and -maxrate it picks VBR by itself.
+_BITRATE_TARGET_ENCODERS = {"libopenh264", "h264_qsv", "hevc_qsv", "h264_vaapi", "hevc_vaapi"}
+
+# VAAPI (Linux, Intel and AMD GPUs) encodes only frames already on the GPU, so
+# they have to be converted and uploaded there first - see vaapi_* below.
+_VAAPI_ENCODERS = {"h264_vaapi", "hevc_vaapi"}
 
 # Software encoders only (hardware encoders have their own, differently-named
 # speed/quality tradeoff options). Left unset, libx264/libx265 default to the
@@ -33,21 +38,36 @@ _BITRATE_TARGET_ENCODERS = {"libopenh264", "h264_qsv", "hevc_qsv"}
 _SOFTWARE_ENCODERS = {"libx264", "libx265"}
 
 
+def hardware_device_args(video_encoder: str) -> list[str]:
+    """Global args opening the GPU for `video_encoder`, placed before the inputs.
+    Empty for encoders that take frames from system memory."""
+    if video_encoder not in _VAAPI_ENCODERS:
+        return []
+    # No device path: libva picks the GPU the desktop runs on, which a fixed
+    # /dev/dri/renderD128 gets wrong on some multi-GPU machines.
+    return ["-init_hw_device", "vaapi=va", "-filter_hw_device", "va"]
+
+
+def upload_filter(video_encoder: str) -> str | None:
+    """Filter to append to the video chain so `video_encoder` gets GPU frames,
+    or None if it needs none. NV12 is 4:2:0, like yuv420p elsewhere."""
+    return "format=nv12,hwupload" if video_encoder in _VAAPI_ENCODERS else None
+
+
 def encoding_args(
     params: EncodingParams, video_encoder: str, has_audio: bool, output_path: Path
 ) -> list[str]:
     """Everything after the inputs: encoders, rate control, and the MKV output.
     Pure - no subprocess, no I/O."""
-    args = [
-        "-c:v",
-        video_encoder,
+    args = ["-c:v", video_encoder]
+    if video_encoder not in _VAAPI_ENCODERS:  # upload_filter() already made it NV12
         # Without this, the encoder keeps the capture's full-chroma BGRA source
         # as-is and produces High 4:4:4 Predictive H.264 - which ffmpeg itself
         # decodes fine, but almost no real player (Windows' own Movies & TV,
         # browsers, phones, hardware decoders) supports. yuv420p (standard
         # 4:2:0) is what "H.264 plays everywhere" actually depends on.
-        "-pix_fmt",
-        "yuv420p",
+        args += ["-pix_fmt", "yuv420p"]
+    args += [
         *_rate_control_args(params, video_encoder),
         "-g",
         str(params.fps * params.keyframe_interval_sec),
