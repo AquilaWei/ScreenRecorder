@@ -1,0 +1,130 @@
+# Flatpak manifest: one package that runs on any distribution with Flatpak,
+# instead of per-distro install lines (whose package names differ and whose
+# ffmpeg may lack x264 - Fedora's does).
+#
+# Everything the recorder runs is already in the KDE runtime, which is the
+# freedesktop runtime plus Qt: ffmpeg (with x264 and VAAPI through the
+# runtime's codec extension) and gst-launch-1.0 with the pipewiresrc,
+# pulsesrc and matroskamux elements. The PySide base app adds Qt for Python
+# built against that same Qt. What is left to ship is three small wheels and
+# our own source.
+#
+# Built offline (no --share=network), so every source is pinned by hash.
+id: io.github.AquilaWei.ScreenRecorder
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+base: io.qt.PySide.BaseApp
+base-version: '6.11'
+command: screenrec
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # System audio: pulsesrc reads the default output's monitor source over the
+  # PulseAudio socket (pipewire-pulse on modern desktops).
+  - --socket=pulseaudio
+  # The GPU, for VAAPI encoding. Without it ffmpeg silently falls back to
+  # x264, which works but costs far more CPU.
+  - --device=dri
+  # Recordings default to ~/Videos. Other folders chosen in the app go through
+  # the file-chooser portal and need no permission here.
+  - --filesystem=xdg-videos
+  # The tray dot shown while recording (StatusNotifierItem).
+  - --talk-name=org.kde.StatusNotifierWatcher
+  #
+  # Deliberately NOT here: the screen itself. It comes through the ScreenCast
+  # portal, which every sandboxed app may call - the same path the unsandboxed
+  # app already takes on Wayland.
+
+cleanup-commands:
+  - /app/cleanup-BaseApp.sh
+  # What the base app brings for building Qt bindings, or for other apps; none
+  # of it is imported here. libclang + LLVM alone are ~150 MB. rm, not the
+  # `cleanup:` list: that one only covers files this manifest's modules added.
+  - >-
+    rm -rf /app/bin/shiboken6* /app/lib/libclang* /app/lib/libLLVM*
+    /app/lib/python3*/site-packages/shiboken6_generator*
+    /app/lib/python3*/site-packages/numpy* /app/lib/python3*/site-packages/OpenGL
+    /app/lib/python3*/site-packages/PyOpenGL*
+    /app/share/metainfo/io.qt.PySide.BaseApp.metainfo.xml
+build-options:
+  env:
+    # Drop QtWebEngine from the base app: ~200 MB this app never uses.
+    BASEAPP_REMOVE_WEBENGINE: '1'
+
+modules:
+  # PipeWire's GStreamer plugin, newer than the runtime's. The KDE 6.11
+  # runtime has 1.4.9, whose pipewiresrc gets timestamps wrong once
+  # keepalive-time resends a frame: measured, 3 s of recording came out as
+  # 63 s of video (and videorate's catch-up made stopping hang). 1.6.9, as on
+  # the host, is right. keepalive can't simply be dropped - without it a still
+  # screen sends no frames at all. Remove this module once the KDE runtime
+  # ships PipeWire 1.6 (freedesktop 26.08 does).
+  - name: pipewire
+    buildsystem: meson
+    config-opts:
+      - -Dauto_features=disabled
+      - -Dgstreamer=enabled
+      - -Dspa-plugins=enabled
+      - -Dsupport=enabled
+      - -Dsession-managers=[]
+      - -Dexamples=disabled
+      - -Dtests=disabled
+      - -Dman=disabled
+      - -Ddocs=disabled
+    cleanup:
+      - /bin
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+    sources:
+      - type: git
+        url: https://gitlab.freedesktop.org/pipewire/pipewire.git
+        tag: 1.6.9
+        commit: 8fa27cabdc6c0c1350c69c026af5850ef0af1e26
+
+  # Keep these versions equal to uv.lock; tests/unit/test_flatpak_manifest.py
+  # fails when they drift.
+  - name: python-dependencies
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-index --no-deps --prefix=/app *.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/b2/a3/e137168c9c44d18eff0376253da9f1e9234d0239e0ee230d2fee6cea8e55/jeepney-0.9.0-py3-none-any.whl
+        sha256: 97e5714520c16fc0a45695e5365a2e11b81ea79bba796e26f9f1d178cb182683
+      - type: file
+        url: https://files.pythonhosted.org/packages/ec/2b/69de6317fbf48865bb12aa56c9cfcfff46b3add0cd45250725d96146dce0/platformdirs-4.11.12-py3-none-any.whl
+        sha256: b1ba966ac76153d9985a0787ffab951e7c18416189873d4e4ddb2c8a04a0a254
+      - type: file
+        url: https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl
+        sha256: 188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90
+
+  - name: screenrec
+    buildsystem: simple
+    build-commands:
+      # Copied rather than pip-installed: building a wheel needs hatchling and
+      # four more pinned wheels, and nothing reads the package metadata.
+      - |
+        purelib="$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib", vars={"base": "/app"}))')"
+        cp -r src/screenrec "$purelib/"
+      - install -Dm755 packaging/flatpak/screenrec.sh /app/bin/screenrec
+      - install -Dm644 packaging/flatpak/io.github.AquilaWei.ScreenRecorder.desktop
+          /app/share/applications/io.github.AquilaWei.ScreenRecorder.desktop
+      - python3 packaging/flatpak/install_metainfo.py
+          packaging/flatpak/io.github.AquilaWei.ScreenRecorder.metainfo.xml .
+          /app/share/metainfo/io.github.AquilaWei.ScreenRecorder.metainfo.xml
+      - install -Dm644 -t /app/share/licenses/io.github.AquilaWei.ScreenRecorder LICENSE NOTICE
+      # The icon is drawn in code (screenrec.ui.app_icon); render it here so
+      # the launcher icon and the window icon cannot drift apart.
+      - QT_QPA_PLATFORM=offscreen python3 packaging/flatpak/render_icons.py /app/share/icons/hicolor
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .venv
+          - build
+          - dist
+          - .git

@@ -32,13 +32,16 @@ is excluded from the recording.
   desktop's own dialog; later ones reuse that choice
 - Video and audio are captured by **one GStreamer pipeline**, so they share a clock
   and stay in sync; ffmpeg encodes, with the same presets and MKV → MP4 flow
-- Falls back to **OpenH264** when ffmpeg has no x264 (e.g. Fedora's own ffmpeg)
+- Encodes on the **graphics card** (NVIDIA, Intel Quick Sync, or VAAPI on Intel
+  and AMD); falls back to x264, or **OpenH264** when ffmpeg has no x264
+  (e.g. Fedora's own ffmpeg)
+- A **Flatpak** that runs the same on any distribution — see below
 - Keeps the machine from sleeping or blanking the screen while recording
 - **Tray dot only**: Linux can't keep a window out of a screen capture, so the
   on-screen red circle isn't shown (it would be recorded)
 
 **Planned:** a specific window or a custom region, microphone mixing, choosing
-the monitor on Windows, Linux packages, and macOS.
+the monitor on Windows, and macOS.
 
 ## Requirements
 
@@ -49,7 +52,25 @@ the monitor on Windows, Linux packages, and macOS.
   full-screen capture)
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 
-**Linux**
+**Linux (Flatpak — recommended)**
+
+- A desktop with xdg-desktop-portal screen casting (KDE Plasma, GNOME, …) and
+  PipeWire — the default on current Fedora and Ubuntu
+- [Flatpak](https://flathub.org/setup) with the Flathub remote. Nothing else:
+  FFmpeg (with x264), GStreamer and Qt come with the Flatpak
+
+Download `ScreenRec-<version>.flatpak` from
+[Releases](https://github.com/AquilaWei/ScreenRecorder/releases), then:
+
+```bash
+flatpak install --user ./ScreenRec-<version>.flatpak
+flatpak run io.github.AquilaWei.ScreenRecorder
+```
+
+After that it's in your application menu as **ScreenRec**. Recordings are saved
+to `~/Videos` by default.
+
+**Linux (from source)**
 
 - A desktop with xdg-desktop-portal screen casting (KDE Plasma, GNOME, …) and
   PipeWire — the default on current Fedora and Ubuntu
@@ -85,6 +106,17 @@ FFmpeg found on `PATH` bundled under `ffmpeg\`) and, if
 with Start menu / optional desktop shortcuts and an uninstaller. Pass
 `-FfmpegPath` to bundle a specific `ffmpeg.exe`. The bundled FFmpeg is
 GPL-licensed; its license is shipped next to it.
+
+## Building the Linux Flatpak
+
+```bash
+flatpak install --user flathub org.flatpak.Builder
+packaging/flatpak/build.sh
+```
+
+Builds, installs it for your user, and writes `build/flatpak/ScreenRec.flatpak`.
+The runtime, SDK and PySide base app it needs are fetched from Flathub on the
+first run.
 
 ## Development
 

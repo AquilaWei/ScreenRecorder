@@ -5,6 +5,9 @@
 - **New**: Linux records with the graphics card's own encoder (VAAPI) on Intel
   and AMD GPUs, instead of falling back to the much slower software encoding.
   Quick Sync and NVIDIA are still preferred where they work
+- **New (test version)**: a Flatpak for Linux. It carries its own FFmpeg (with
+  x264), GStreamer and Qt, so it installs the same way on any distribution
+  instead of needing each one's packages
 
 ## 0.1.1 - 2026-09-24
 

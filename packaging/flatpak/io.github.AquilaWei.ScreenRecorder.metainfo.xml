@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata. The release version is filled in at build time from
+     pyproject.toml by install_metainfo.py, so the version lives in one place. -->
+<component type="desktop-application">
+  <id>io.github.AquilaWei.ScreenRecorder</id>
+
+  <name>ScreenRec</name>
+  <summary>錄製螢幕畫面與系統聲音</summary>
+  <summary xml:lang="en">Record the screen with system audio</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+
+  <developer id="io.github.aquilawei">
+    <name>AquilaWei</name>
+  </developer>
+
+  <description>
+    <p>錄製整個螢幕與系統聲音，影音保持同步，存成到處都能播放的 MP4。</p>
+    <p xml:lang="en">
+      Records the full screen together with system audio, kept in sync, and
+      saves it as an MP4 that plays everywhere.
+    </p>
+    <p>有顯示卡時用顯示卡編碼，錄影時系統匣會顯示紅點。</p>
+    <p xml:lang="en">
+      Encodes on the graphics card when there is one, and shows a red dot in
+      the tray while recording.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.AquilaWei.ScreenRecorder.desktop</launchable>
+
+  <url type="homepage">https://github.com/AquilaWei/ScreenRecorder</url>
+  <url type="bugtracker">https://github.com/AquilaWei/ScreenRecorder/issues</url>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+  </categories>
+
+  <keywords>
+    <keyword>screen recorder</keyword>
+    <keyword>screencast</keyword>
+    <keyword>錄影</keyword>
+    <keyword>螢幕錄製</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+  </releases>
+</component>

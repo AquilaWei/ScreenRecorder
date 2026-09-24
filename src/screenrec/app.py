@@ -22,6 +22,9 @@ def run() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName("ScreenRec")
+    # Wayland matches windows to their launcher entry (and so their taskbar
+    # icon) by this name; it is the Flatpak's app id and .desktop file name.
+    app.setDesktopFileName("io.github.AquilaWei.ScreenRecorder")
     app.setWindowIcon(make_app_icon())
     window = MainWindow()
     window.show()

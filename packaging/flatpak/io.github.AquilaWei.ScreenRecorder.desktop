@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=ScreenRec
+Comment=Record the screen with system audio
+Comment[zh_TW]=錄製螢幕畫面與系統聲音
+Exec=screenrec
+Icon=io.github.AquilaWei.ScreenRecorder
+Terminal=false
+Categories=AudioVideo;Video;Recorder;Qt;
+Keywords=screen;recorder;capture;video;錄影;螢幕;
+StartupWMClass=screenrec
