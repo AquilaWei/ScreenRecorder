@@ -105,7 +105,11 @@ def select_working_encoder(
 
 
 def choose_encoder(spec: RecordingSpec, ffmpeg_path: str = "ffmpeg") -> str:
-    """The best encoder for `spec.codec` that really works with this ffmpeg."""
+    """The best encoder for `spec.codec` that really works with this ffmpeg.
+
+    Raises RuntimeError if none of the candidates works, and CalledProcessError
+    if `ffmpeg -encoders` itself fails.
+    """
     available = list_available_encoders(ffmpeg_path)
     return select_working_encoder(
         available, spec.codec, probe=lambda name: probe_encoder(name, ffmpeg_path)

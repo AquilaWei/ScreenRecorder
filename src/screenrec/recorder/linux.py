@@ -52,6 +52,8 @@ _VIDEO_QUEUE_SEC = 1
 
 
 def find_gst_launch() -> str:
+    """Path of gst-launch-1.0. Raises FileNotFoundError (with install hints for
+    the user) if GStreamer's command-line tool isn't installed."""
     path = shutil.which("gst-launch-1.0")
     if path is None:
         raise FileNotFoundError(
@@ -64,7 +66,14 @@ def find_gst_launch() -> str:
 def build_gst_args(pipewire_fd: int, node_id: int, fps: int, with_audio: bool) -> list[str]:
     """gst-launch-1.0 args that write raw video (+ audio) as Matroska to stdout.
     Pure - no subprocess, no I/O."""
-    video = [
+    audio = _audio_branch() if with_audio else []
+    mux = ["matroskamux", "name=mux", "streamable=true", "!", "fdsink", "fd=1"]
+    # -e: turn SIGINT into end-of-stream so the Matroska stream is finished properly.
+    return ["-e", "-q", *_video_branch(pipewire_fd, node_id, fps), *audio, *mux]
+
+
+def _video_branch(pipewire_fd: int, node_id: int, fps: int) -> list[str]:
+    return [
         "pipewiresrc",
         f"fd={pipewire_fd}",
         # `path` is deprecated in favour of `target-object`, but that one takes
@@ -93,7 +102,10 @@ def build_gst_args(pipewire_fd: int, node_id: int, fps: int, with_audio: bool) -
         "!",
         "mux.",
     ]
-    audio = [
+
+
+def _audio_branch() -> list[str]:
+    return [
         "pulsesrc",
         f"device={DEFAULT_MONITOR}",
         "!",
@@ -103,9 +115,6 @@ def build_gst_args(pipewire_fd: int, node_id: int, fps: int, with_audio: bool) -
         "!",
         "mux.",
     ]
-    mux = ["matroskamux", "name=mux", "streamable=true", "!", "fdsink", "fd=1"]
-    # -e: turn SIGINT into end-of-stream so the Matroska stream is finished properly.
-    return ["-e", "-q", *video, *(audio if with_audio else []), *mux]
 
 
 def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str) -> list[str]:
@@ -145,6 +154,13 @@ class StderrTail:
 
 
 class LinuxBackend:
+    """Full-screen recording on Linux (Wayland or X11) - see the module docstring.
+
+    Needs a desktop with xdg-desktop-portal screen casting, PipeWire, and
+    gst-launch-1.0 with the pipewiresrc/pulsesrc/matroskamux elements; any of
+    them missing surfaces as an exception from `start()`.
+    """
+
     def __init__(self, ffmpeg_path: str | None = None) -> None:
         """`ffmpeg_path` defaults to `find_ffmpeg()`, resolved on first start()
         so a missing ffmpeg is reported as a start error, not a crash."""
@@ -190,6 +206,9 @@ class LinuxBackend:
         on_event(Event.BACKEND_STARTED)
 
     def stop(self) -> None:
+        """End the recording and wait (up to STOP_TIMEOUT_SEC per process) for
+        the file to be finished; past that the processes are killed, which
+        still leaves a readable MKV. Does nothing if not recording."""
         if self._gst is None:
             return
         try:
