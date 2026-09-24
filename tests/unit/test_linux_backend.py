@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from screenrec.recorder.linux import build_ffmpeg_args, build_gst_args
+from screenrec.recorder.linux import (
+    SLEEP_NOT_INHIBITED_WARNING,
+    LinuxBackend,
+    build_ffmpeg_args,
+    build_gst_args,
+)
 from screenrec.recorder.spec import (
     AudioSource,
     CaptureMode,
@@ -106,3 +111,28 @@ def test_region_capture_mode_is_not_yet_implemented():
     )
     with pytest.raises(NotImplementedError, match="M2"):
         build_ffmpeg_args(spec, "libopenh264")
+
+
+def test_start_warns_the_user_when_the_desktop_wont_keep_the_machine_awake(monkeypatch):
+    # Regression test: this failure used to go only to stderr, which the GUI
+    # never shows - a long recording could silently end at the next sleep.
+    portal = pytest.importorskip("screenrec.recorder.portal")
+
+    class _SessionWithoutInhibit:
+        restore_token = None
+
+        def __init__(self, restore_token):
+            pass
+
+        def open(self):
+            return portal.ScreenStream(fd=-1, node_id=1)
+
+        def inhibit_sleep(self, reason):
+            raise RuntimeError("no Inhibit portal")
+
+    monkeypatch.setattr(portal, "ScreenCastSession", _SessionWithoutInhibit)
+    backend = LinuxBackend(ffmpeg_path="ffmpeg")
+
+    backend._open_screen()
+
+    assert backend.start_warnings == [SLEEP_NOT_INHIBITED_WARNING]

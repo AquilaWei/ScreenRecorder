@@ -184,6 +184,8 @@ class MainWindow(QWidget):
         status = f"錄製中：{self._pending_spec.output_path.name}"
         if CAN_EXCLUDE_FROM_CAPTURE and not self._indicator.excluded_from_capture:
             status += "\n注意：這台電腦無法把紅色圓點排除在錄影之外，它會被錄進去"
+        for warning in self._backend.start_warnings:
+            status += f"\n注意：{warning}"
         self._status_label.setText(status)
 
     def _stop_recording(self) -> None:

@@ -41,6 +41,8 @@ AUDIO_CHANNELS = 2
 STARTUP_TIMEOUT_SEC = 30
 STOP_TIMEOUT_SEC = 15
 
+SLEEP_NOT_INHIBITED_WARNING = "桌面不允許暫停休眠，長時間錄影前請先關閉自動休眠與螢幕關閉"
+
 # PulseAudio's (and pipewire-pulse's) alias for "the monitor of whatever the
 # default output is right now" - no need to look the sink up ourselves.
 DEFAULT_MONITOR = "@DEFAULT_MONITOR@"
@@ -173,6 +175,7 @@ class LinuxBackend:
         # Lets the desktop skip its "which screen?" dialog after the first
         # recording (for as long as the app runs).
         self._restore_token: str | None = None
+        self.start_warnings: list[str] = []
 
     @property
     def ffmpeg_path(self) -> str:
@@ -186,6 +189,7 @@ class LinuxBackend:
         validate(spec)
         if spec.audio not in (AudioSource.NONE, AudioSource.SYSTEM):
             raise NotImplementedError("microphone mixing lands in M2, not yet supported")
+        self.start_warnings = []
         try:
             gst_path = find_gst_launch()
             encoder = choose_encoder(spec, self.ffmpeg_path)
@@ -233,6 +237,7 @@ class LinuxBackend:
         try:
             self._session.inhibit_sleep("ScreenRec 錄製中")
         except Exception as exc:  # noqa: BLE001 - recording works without it
+            self.start_warnings.append(SLEEP_NOT_INHIBITED_WARNING)
             if sys.stderr is not None:
                 print(f"could not inhibit sleep: {exc}", file=sys.stderr)
         return stream

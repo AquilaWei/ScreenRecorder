@@ -325,6 +325,7 @@ class WindowsBackend:
         self._process: subprocess.Popen | None = None
         self._audio_capture: WasapiLoopbackCapture | None = None
         self._audio_sink: AudioSocketSink | None = None
+        self.start_warnings: list[str] = []  # none so far on Windows
 
     def start(self, spec: RecordingSpec, on_event: Callable[[Event], None]) -> None:
         validate(spec)

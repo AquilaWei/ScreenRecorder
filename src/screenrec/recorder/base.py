@@ -9,6 +9,10 @@ from screenrec.recorder.spec import RecordingSpec
 
 
 class Backend(Protocol):
+    # Problems that didn't keep the last start() from recording but the user
+    # should hear about (e.g. the machine may fall asleep). Reset by each start().
+    start_warnings: list[str]
+
     def start(self, spec: RecordingSpec, on_event: Callable[[object], None]) -> None:
         """Launch the recording subprocess for `spec`.
 
