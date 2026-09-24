@@ -19,16 +19,16 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from pathlib import Path
 
 from screenrec import power
-from screenrec.presets import AUDIO_BITRATE_KBPS, get_encoding_params
+from screenrec.presets import get_encoding_params
 from screenrec.recorder.controller import Event
 from screenrec.recorder.encoders import (
     list_available_encoders,
     probe_encoder,
     select_working_encoder,
 )
+from screenrec.recorder.ffmpeg_common import encoding_args, wait_for_output
 from screenrec.recorder.ffmpeg_exe import NO_WINDOW, find_ffmpeg
 from screenrec.recorder.spec import AudioSource, CaptureMode, RecordingSpec, validate
 
@@ -41,24 +41,6 @@ STARTUP_TIMEOUT_SEC = 30
 # GetTickCount64 with 15.6ms resolution, coarse enough to misplace whole audio
 # chunks relative to the first video frame (found in CI on Python 3.12).
 audio_clock = time.perf_counter
-
-# ffmpeg's flag for "constant quality" differs per encoder family.
-_QUALITY_FLAG = {
-    "libx264": "-crf",
-    "libx265": "-crf",
-    "h264_nvenc": "-cq",
-    "hevc_nvenc": "-cq",
-    "h264_qsv": "-global_quality",
-    "hevc_qsv": "-global_quality",
-}
-
-# Software encoders only (hardware encoders have their own, differently-named
-# speed/quality tradeoff options). Left unset, libx264/libx265 default to the
-# "medium" preset, which is not reliably fast enough for real-time 1080p+
-# screen encoding - found live: recordings dropped video frames (and the
-# backlog worsened over the course of the recording) on a 6-core/12-thread
-# desktop CPU because the encoder couldn't keep up in real time.
-_SOFTWARE_ENCODERS = {"libx264", "libx265"}
 
 
 def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str, audio_url: str | None) -> list[str]:
@@ -98,41 +80,7 @@ def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str, audio_url: str | 
             audio_url,
         ]
 
-    quality_flag = _QUALITY_FLAG.get(video_encoder, "-crf")
-    args += [
-        "-c:v",
-        video_encoder,
-        # Without this, the encoder keeps the capture's full-chroma BGRA source
-        # as-is and produces High 4:4:4 Predictive H.264 - which ffmpeg itself
-        # decodes fine, but almost no real player (Windows' own Movies & TV,
-        # browsers, phones, hardware decoders) supports. yuv420p (standard
-        # 4:2:0) is what "H.264 plays everywhere" actually depends on.
-        "-pix_fmt",
-        "yuv420p",
-        quality_flag,
-        str(params.crf),
-        "-maxrate",
-        f"{params.max_bitrate_kbps}k",
-        "-bufsize",
-        f"{params.max_bitrate_kbps * 2}k",
-        "-g",
-        str(params.fps * params.keyframe_interval_sec),
-    ]
-    if video_encoder in _SOFTWARE_ENCODERS:
-        args += ["-preset", "veryfast"]
-
-    # NOTE: no -shortest here - with a live lavfi video input it made ffmpeg
-    # buffer ~10s before emitting the first video frame (measured live). The
-    # short silent-video tail it would trim is trimmed at remux time instead.
-    args += ["-c:a", "aac", "-b:a", f"{AUDIO_BITRATE_KBPS}k"] if audio_url else ["-an"]
-    # Explicit CFR output at the target fps instead of leaving ffmpeg's default
-    # frame-rate-conversion heuristics to decide when to drop/duplicate frames
-    # against ddagrab's (not perfectly clock-aligned) capture timestamps.
-    args += ["-fps_mode", "cfr", "-r", str(params.fps)]
-    # Write packets out as they're muxed instead of buffering in memory: start()
-    # waits for the file to appear, which took ~7s with default buffering, and
-    # a crash/kill now loses at most a moment of recording.
-    args += ["-flush_packets", "1", "-f", "matroska", str(spec.output_path)]
+    args += encoding_args(params, video_encoder, audio_url is not None, spec.output_path)
     return args
 
 
@@ -249,25 +197,6 @@ class SilencePadder:
             return None
         self._padded_until += frames / AUDIO_SAMPLE_RATE
         return silence_chunk(frames)
-
-
-def wait_for_output(
-    path: Path,
-    is_running: Callable[[], bool],
-    timeout: float,
-    poll_interval: float = 0.2,
-) -> bool:
-    """Wait until ffmpeg has actually started writing `path`. False if it exits
-    first or `timeout` passes - ffmpeg can hang at startup without any error
-    (found live: no output file, no I/O, audio writer blocked forever)."""
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if path.exists() and path.stat().st_size > 0:
-            return True
-        if not is_running():
-            return False
-        time.sleep(poll_interval)
-    return False
 
 
 class AudioSocketSink:
