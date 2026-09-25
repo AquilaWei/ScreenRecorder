@@ -26,8 +26,17 @@ _QUALITY_FLAG = {
 # variable bitrate instead. OpenH264 has no quality mode at all. QSV's
 # -global_quality selects constant QP, which ignores -maxrate: measured live at
 # ~125 Mbps on busy 1080p content against an 8 Mbps ceiling. VAAPI takes no
-# -crf, and with a bitrate and -maxrate it picks VBR by itself.
-_BITRATE_TARGET_ENCODERS = {"libopenh264", "h264_qsv", "hevc_qsv", "h264_vaapi", "hevc_vaapi"}
+# -crf, and with a bitrate and -maxrate it picks VBR by itself. VideoToolbox's
+# -q:v constant quality exists only on Apple Silicon and ignores -maxrate.
+_BITRATE_TARGET_ENCODERS = {
+    "libopenh264",
+    "h264_qsv",
+    "hevc_qsv",
+    "h264_vaapi",
+    "hevc_vaapi",
+    "h264_videotoolbox",
+    "hevc_videotoolbox",
+}
 
 # VAAPI (Linux, Intel and AMD GPUs) encodes only frames already on the GPU, so
 # they have to be converted and uploaded there first - see vaapi_* below.

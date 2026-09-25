@@ -1,6 +1,8 @@
 """Detect available FFmpeg encoders and pick the best one for a codec.
 
 Fallback order follows the feasibility study: hardware encoders first, software last.
+VideoToolbox is macOS' own hardware encoder and never coexists with the vendor
+ones or VAAPI, so its place among them doesn't matter.
 VAAPI comes after the vendor encoders: it is Linux's one path to Intel and AMD
 hardware encoding, and the only one a Flatpak's ffmpeg has. OpenH264 is the
 last resort: lower quality per bit than x264, but it's what distributions that
@@ -22,11 +24,19 @@ _FALLBACK_CHAINS: dict[VideoCodec, tuple[str, ...]] = {
         "h264_nvenc",
         "h264_qsv",
         "h264_amf",
+        "h264_videotoolbox",
         "h264_vaapi",
         "libx264",
         "libopenh264",
     ),
-    VideoCodec.HEVC: ("hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_vaapi", "libx265"),
+    VideoCodec.HEVC: (
+        "hevc_nvenc",
+        "hevc_qsv",
+        "hevc_amf",
+        "hevc_videotoolbox",
+        "hevc_vaapi",
+        "libx265",
+    ),
 }
 
 # `ffmpeg -encoders` lines look like " V..... libx264   <description>" - 6 capability

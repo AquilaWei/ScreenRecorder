@@ -103,3 +103,14 @@ def test_select_video_encoder_prefers_vaapi_over_software():
 def test_select_video_encoder_prefers_qsv_over_vaapi():
     available = {"h264_qsv", "h264_vaapi"}
     assert select_video_encoder(available, VideoCodec.H264) == "h264_qsv"
+
+
+def test_select_video_encoder_prefers_videotoolbox_over_software():
+    # macOS: VideoToolbox is the hardware path; the bundled ffmpeg also has x264.
+    available = {"h264_videotoolbox", "libx264", "libopenh264"}
+    assert select_video_encoder(available, VideoCodec.H264) == "h264_videotoolbox"
+
+
+def test_select_video_encoder_picks_videotoolbox_for_hevc():
+    available = {"hevc_videotoolbox", "libx265"}
+    assert select_video_encoder(available, VideoCodec.HEVC) == "hevc_videotoolbox"

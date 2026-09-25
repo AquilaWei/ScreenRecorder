@@ -59,3 +59,12 @@ def test_qsv_uses_a_capped_variable_bitrate_not_constant_qp():
     assert "-global_quality" not in args
     assert args[args.index("-b:v") + 1] == "6000k"
     assert args[args.index("-maxrate") + 1] == "8000k"
+
+
+def test_videotoolbox_uses_a_capped_variable_bitrate():
+    args = encoding_args(
+        STANDARD_H264, "h264_videotoolbox", has_audio=False, output_path=Path("o.mkv")
+    )
+    assert "-crf" not in args
+    assert args[args.index("-b:v") + 1] == "6000k"
+    assert args[args.index("-maxrate") + 1] == "8000k"
