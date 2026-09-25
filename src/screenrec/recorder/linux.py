@@ -21,8 +21,6 @@ import shutil
 import signal
 import subprocess
 import sys
-import threading
-from collections import deque
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -30,6 +28,7 @@ from screenrec.presets import get_encoding_params
 from screenrec.recorder.controller import Event
 from screenrec.recorder.encoders import choose_encoder
 from screenrec.recorder.ffmpeg_common import (
+    StderrTail,
     encoding_args,
     hardware_device_args,
     upload_filter,
@@ -146,25 +145,6 @@ def build_ffmpeg_args(spec: RecordingSpec, video_encoder: str) -> list[str]:
     has_audio = spec.audio is AudioSource.SYSTEM
     args += encoding_args(params, video_encoder, has_audio, spec.output_path)
     return args
-
-
-class StderrTail:
-    """Drains a child's stderr (it would block once the pipe fills), keeping
-    the last few lines for error messages and echoing them for debugging."""
-
-    def __init__(self, stream, name: str) -> None:
-        self._stream = stream
-        self._name = name
-        self.lines: deque[str] = deque(maxlen=10)
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def _run(self) -> None:
-        for line in self._stream:
-            text = line.decode("utf-8", errors="replace").rstrip()
-            self.lines.append(text)
-            if sys.stderr is not None:
-                print(f"[{self._name}] {text}", file=sys.stderr)
 
 
 class LinuxBackend:

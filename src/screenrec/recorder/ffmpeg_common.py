@@ -1,10 +1,14 @@
 """ffmpeg pieces shared by every platform backend: the encoding/output half of the
-command line, and waiting for ffmpeg to actually start writing.
+command line, waiting for ffmpeg to actually start writing, and draining the
+stderr of the processes each backend runs.
 """
 
 from __future__ import annotations
 
+import sys
+import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
@@ -121,3 +125,22 @@ def wait_for_output(
             return False
         time.sleep(poll_interval)
     return False
+
+
+class StderrTail:
+    """Drains a child's stderr (it would block once the pipe fills), keeping
+    the last few lines for error messages and echoing them for debugging."""
+
+    def __init__(self, stream, name: str) -> None:
+        self._stream = stream
+        self._name = name
+        self.lines: deque[str] = deque(maxlen=10)
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        for line in self._stream:
+            text = line.decode("utf-8", errors="replace").rstrip()
+            self.lines.append(text)
+            if sys.stderr is not None:
+                print(f"[{self._name}] {text}", file=sys.stderr)
