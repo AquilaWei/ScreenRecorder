@@ -69,6 +69,7 @@ SCK_TIMEOUT_SEC = 10
 # some. Frames are copied out in the callback, so a small one is enough.
 _QUEUE_DEPTH = 5
 
+_ASBD_FORMAT_FLAGS = 2  # index of mFormatFlags in AudioStreamBasicDescription
 _kAudioFormatFlagIsNonInterleaved = 1 << 5
 
 PERMISSION_DENIED_MESSAGE = (
@@ -268,11 +269,12 @@ class ScreenCapture:
         status, data = CMBlockBufferCopyDataBytes(block, 0, length, None)
         if status != 0:
             raise RuntimeError(f"CMBlockBufferCopyDataBytes failed: {status}")
-        description = CMAudioFormatDescriptionGetStreamBasicDescription(
+        # pyobjc returns the AudioStreamBasicDescription as a plain tuple.
+        format_flags = CMAudioFormatDescriptionGetStreamBasicDescription(
             CMSampleBufferGetFormatDescription(sample_buffer)
-        )
+        )[_ASBD_FORMAT_FLAGS]
         data = bytes(data)
-        if description.mFormatFlags & _kAudioFormatFlagIsNonInterleaved:
+        if format_flags & _kAudioFormatFlagIsNonInterleaved:
             # One buffer per channel, stored one after the other.
             half = len(data) // 2
             data = interleave_f32(data[:half], data[half:])
