@@ -5,7 +5,7 @@ video quality, save location, and capture range (full screen, a window, or a cus
 region). A translucent red circle marks that recording is active — the circle itself
 is excluded from the recording.
 
-**Status: early development — Windows, plus a Linux test version.** See
+**Status: early development — Windows and Linux (full-screen recording).** See
 [`CHANGELOG.md`](CHANGELOG.md) for what works today.
 
 ## What it does
@@ -24,7 +24,7 @@ is excluded from the recording.
   hides capture-excluded windows. Windows 10 puts new tray icons in the hidden
   `^` overflow: drag it onto the taskbar once and Windows remembers
 
-**Works now (Linux, test version - not yet accepted on real hardware):**
+**Works now (Linux):**
 
 - Records the **full screen** with **system audio** (tested on KDE Plasma, Wayland), through
   the desktop's screen-sharing portal (xdg-desktop-portal + PipeWire). The first
@@ -137,7 +137,7 @@ Unit tests run with no external dependencies. Integration tests that invoke a re
 ## Contributing
 
 Windows comes first (milestones M1–M4), then Linux (M5, full-screen recording
-already in testing) and macOS (M6). Each milestone lands as a `0.0.x` test release until it's
+already released) and macOS (M6). Each milestone lands as a `0.0.x` test release until it's
 been verified on real hardware, then becomes a `0.x.0` release — see `CHANGELOG.md`.
 
 ## License
