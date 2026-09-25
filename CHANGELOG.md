@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 - 2026-09-25
+
+- **Windows, Linux and macOS accepted** on real hardware. No code changes since
+  0.2.2. New since 0.2.0:
+  - **macOS**: full-screen recording with system audio on Apple Silicon Macs
+    (macOS 13+) through ScreenCaptureKit, no extra audio driver needed; the red
+    circle and ScreenRec's own window are kept out of the recording; encoding
+    on the Mac's hardware encoder; the Mac stays awake while recording; a `.dmg`
+    with FFmpeg bundled
+  - **Windows**: the installer (`ScreenRec-Setup-<version>.exe`, FFmpeg
+    bundled) is published on every release
+  - Every release now ships all three installers — Windows `.exe`, macOS
+    `.dmg`, Linux `.flatpak` — with SHA256 checksums
+  - Recordings are saved to the system's own videos folder by default
+
 ## 0.2.2 - 2026-09-25
 
 - **New**: the Windows installer (`ScreenRec-Setup-<version>.exe`) is now
