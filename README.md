@@ -5,7 +5,8 @@ video quality, save location, and capture range (full screen, a window, or a cus
 region). A translucent red circle marks that recording is active — the circle itself
 is excluded from the recording.
 
-**Status: early development — Windows and Linux (full-screen recording).** See
+**Status: early development — Windows and Linux (full-screen recording), plus a
+macOS test version.** See
 [`CHANGELOG.md`](CHANGELOG.md) for what works today.
 
 ## What it does
@@ -40,8 +41,20 @@ is excluded from the recording.
 - **Tray dot only**: Linux can't keep a window out of a screen capture, so the
   on-screen red circle isn't shown (it would be recorded)
 
-**Planned:** a specific window or a custom region, microphone mixing, choosing
-the monitor on Windows, and macOS.
+**Works now (macOS, test version - not yet accepted on real hardware):**
+
+- Records the **full screen** with **system audio** through Apple's
+  **ScreenCaptureKit** (macOS 13+) — no extra audio driver needed; audio is
+  aligned to the video by the timestamps both share
+- The **red circle** is shown and, like on Windows, kept **out of the
+  recording** — so is ScreenRec's own window
+- Encodes on the Mac's **hardware encoder** (VideoToolbox), falling back to x264
+- Same presets and crash-safe MKV → MP4 flow; keeps the Mac awake while
+  recording; a **red dot in the menu bar**
+- A **.dmg** with FFmpeg bundled — Apple Silicon only
+
+**Planned:** a specific window or a custom region, microphone mixing, and
+choosing the monitor.
 
 ## Requirements
 
@@ -181,7 +194,7 @@ Unit tests run with no external dependencies. Integration tests that invoke a re
 ## Contributing
 
 Windows comes first (milestones M1–M4), then Linux (M5, full-screen recording
-already released) and macOS (M6). Each milestone lands as a `0.0.x` test release until it's
+already released) and macOS (M6, full-screen recording in testing). Each milestone lands as a `0.0.x` test release until it's
 been verified on real hardware, then becomes a `0.x.0` release — see `CHANGELOG.md`.
 
 ## License
