@@ -58,7 +58,23 @@ choosing the monitor.
 
 ## Requirements
 
-**Windows**
+**Windows (installer — recommended)**
+
+- Windows 10 2004+ (64-bit)
+- Nothing else: FFmpeg comes with the installer
+
+Download `ScreenRec-Setup-<version>.exe` from
+[Releases](https://github.com/AquilaWei/ScreenRecorder/releases) and run it —
+it installs for your user only, no admin rights needed. The installer isn't
+code-signed yet, so SmartScreen may warn: click **More info → Run anyway**.
+
+After that it's in the Start menu as **ScreenRec**. Recordings are saved to
+your **Videos** folder by default.
+
+**Updating:** download the newer installer and run it — it replaces the
+installed version.
+
+**Windows (from source)**
 
 - Windows 10 2004+
 - [FFmpeg](https://www.gyan.dev/ffmpeg/builds/) 8.0+ on `PATH` (needed for `ddagrab`
@@ -156,6 +172,14 @@ FFmpeg found on `PATH` bundled under `ffmpeg\`) and, if
 with Start menu / optional desktop shortcuts and an uninstaller. Pass
 `-FfmpegPath` to bundle a specific `ffmpeg.exe`. The bundled FFmpeg is
 GPL-licensed; its license is shipped next to it.
+
+Releases bundle the pinned FFmpeg build that `packaging\fetch_ffmpeg.ps1`
+downloads (checked against its SHA256); to build exactly that locally:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\fetch_ffmpeg.ps1 build\ffmpeg
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -FfmpegPath build\ffmpeg\bin\ffmpeg.exe
+```
 
 ## Building the Linux Flatpak
 

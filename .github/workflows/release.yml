@@ -1,9 +1,10 @@
 name: Release
 
-# Pushing a version tag (vX.Y.Z) builds the Linux Flatpak and the macOS .dmg
-# and publishes them as a GitHub Release, with release notes taken from that
-# version's CHANGELOG section and SHA256 checksums. Run it by hand (Actions >
-# Release > Run workflow) to build both without publishing anything.
+# Pushing a version tag (vX.Y.Z) builds the Linux Flatpak, the macOS .dmg and
+# the Windows installer and publishes them as a GitHub Release, with release
+# notes taken from that version's CHANGELOG section and SHA256 checksums. Run it
+# by hand (Actions > Release > Run workflow) to build all three without
+# publishing anything.
 on:
   push:
     tags: ["v*"]
@@ -69,8 +70,44 @@ jobs:
           path: dist/ScreenRec-*.dmg
           if-no-files-found: error
 
+  windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.14"
+      - name: Check the tag matches pyproject.toml
+        if: github.ref_type == 'tag'
+        run: |
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "tag $env:GITHUB_REF_NAME but pyproject.toml says $version" }
+      - name: Install Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed" } }
+      # A pinned FFmpeg rather than choco's: `Get-Command ffmpeg` would find
+      # Chocolatey's shim stub, and build.ps1 would bundle that instead.
+      - run: packaging\fetch_ffmpeg.ps1 build\ffmpeg
+      - run: packaging\build.ps1 -FfmpegPath build\ffmpeg\bin\ffmpeg.exe -RequireInstaller
+      # Smallest real-environment check: the built app starts and stays up.
+      - name: Launch the app
+        run: |
+          $app = Start-Process dist\ScreenRec\ScreenRec.exe -PassThru
+          Start-Sleep -Seconds 15
+          if ($app.HasExited) { throw "ScreenRec exited with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: dist/ScreenRec-Setup-*.exe
+          if-no-files-found: error
+
   publish:
-    needs: [flatpak, macos]
+    needs: [flatpak, macos, windows]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
@@ -83,6 +120,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: macos
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows
       - name: Release notes from CHANGELOG.md
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -90,7 +130,7 @@ jobs:
             'index($0, heading) == 1 {found = 1; next} found && /^## / {exit} found' \
             CHANGELOG.md > notes.md
           test -s notes.md || { echo "no CHANGELOG section for $version"; exit 1; }
-      - run: sha256sum ScreenRec-*.flatpak ScreenRec-*.dmg > SHA256SUMS
+      - run: sha256sum ScreenRec-*.flatpak ScreenRec-*.dmg ScreenRec-Setup-*.exe > SHA256SUMS
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -99,5 +139,5 @@ jobs:
           # x.y.0 has passed acceptance on real hardware; other patch versions
           # are test releases (see CHANGELOG), so mark them as pre-releases.
           prerelease=$([ "${version##*.}" = 0 ] || echo --prerelease)
-          gh release create "$GITHUB_REF_NAME" ScreenRec-*.flatpak ScreenRec-*.dmg SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" ScreenRec-*.flatpak ScreenRec-*.dmg ScreenRec-Setup-*.exe SHA256SUMS \
             --title "ScreenRec $version" --notes-file notes.md $prerelease

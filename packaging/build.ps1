@@ -1,10 +1,14 @@
 # Builds dist\ScreenRec\ScreenRec.exe (PyInstaller) and, if Inno Setup is
 # installed, dist\ScreenRec-Setup-<version>.exe.
 #
-#   powershell -ExecutionPolicy Bypass -File packaging\build.ps1 [-FfmpegPath C:\path\ffmpeg.exe]
+#   powershell -ExecutionPolicy Bypass -File packaging\build.ps1 [-FfmpegPath C:\path\ffmpeg.exe] [-RequireInstaller]
+#
+# -RequireInstaller fails the build when Inno Setup is missing instead of
+# skipping the installer (the release workflow uses it).
 
 param(
-    [string]$FfmpegPath = ""
+    [string]$FfmpegPath = "",
+    [switch]$RequireInstaller
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +44,8 @@ $iscc = @(
 if ($iscc) {
     & $iscc "/DAppVersion=$version" packaging\installer.iss
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+} elseif ($RequireInstaller) {
+    throw "Inno Setup 6 not found - can't build the installer"
 } else {
     Write-Host "Inno Setup not found - skipped the installer; dist\ScreenRec is still usable as-is"
 }
