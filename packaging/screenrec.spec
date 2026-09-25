@@ -1,15 +1,20 @@
-# PyInstaller spec - build with packaging/build.ps1, not directly.
+# PyInstaller spec - build with packaging/build.ps1 (Windows) or
+# packaging/macos/build.sh (macOS), not directly.
 # One-folder (not one-file) build: starts faster, and ffmpeg sits next to it.
 
+import sys
+import tomllib
 from pathlib import Path
 
 HERE = Path(SPECPATH)
 ROOT = HERE.parent
+MACOS = sys.platform == "darwin"
 
 a = Analysis(
     [str(HERE / "launcher.py")],
     pathex=[str(ROOT / "src")],
-    hiddenimports=["pyaudiowpatch"],
+    # Imported only inside functions, so the analysis can't see them.
+    hiddenimports=["screenrec.recorder.screencapture"] if MACOS else ["pyaudiowpatch"],
     excludes=["tkinter", "unittest", "pytest"],
     noarchive=False,
 )
@@ -48,6 +53,23 @@ exe = EXE(
     exclude_binaries=True,
     name="ScreenRec",
     console=False,
-    icon=str(HERE / "screenrec.ico"),
+    icon=str(HERE / ("screenrec.icns" if MACOS else "screenrec.ico")),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="ScreenRec")
+
+if MACOS:
+    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+    app = BUNDLE(
+        coll,
+        name="ScreenRec.app",
+        icon=str(HERE / "screenrec.icns"),
+        bundle_identifier="io.github.AquilaWei.ScreenRecorder",
+        info_plist={
+            "CFBundleShortVersionString": version,
+            "CFBundleVersion": version,
+            # ScreenCaptureKit with system audio needs macOS 13.
+            "LSMinimumSystemVersion": "13.0",
+            "NSHighResolutionCapable": True,
+            "LSApplicationCategoryType": "public.app-category.video",
+        },
+    )

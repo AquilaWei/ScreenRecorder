@@ -91,6 +91,38 @@ here rather than on Flathub.
 
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 
+**macOS (test version)**
+
+- macOS 13 Ventura or later on an **Apple Silicon** Mac (M1 or newer)
+- Nothing else: FFmpeg comes with the app
+
+Download `ScreenRec-<version>.dmg` from
+[Releases](https://github.com/AquilaWei/ScreenRecorder/releases), open it and
+drag **ScreenRec** into **Applications**. Then:
+
+1. **First launch:** the app isn't signed with an Apple Developer ID, so
+   **right-click → Open** it in Applications and confirm once. (On macOS 15, if
+   there's no Open button: **System Settings → Privacy & Security → Open
+   Anyway**.)
+2. **Screen Recording permission:** the first recording asks for it. Turn
+   ScreenRec on in **System Settings → Privacy & Security → Screen Recording**
+   (**Screen & System Audio Recording** on macOS 15), then **quit and reopen**
+   ScreenRec — macOS only applies it after a restart.
+
+Recordings are saved to `~/Movies` by default.
+
+**Updating:** download the newer `.dmg` and drag ScreenRec into Applications
+again, replacing the old one. macOS may ask for the Screen Recording permission
+again after an update: if recording fails, switch ScreenRec off and on in that
+same settings page and reopen it.
+
+**macOS (from source)**
+
+- macOS 13+ on Apple Silicon
+- FFmpeg on `PATH`, e.g. `brew install ffmpeg`
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/)
+- The Screen Recording permission for the terminal app you run it from
+
 ## Running it
 
 ```bash
@@ -122,6 +154,18 @@ packaging/flatpak/build.sh
 Builds, installs it for your user, and writes `build/flatpak/ScreenRec.flatpak`.
 The runtime, SDK and PySide base app it needs are fetched from Flathub on the
 first run.
+
+## Building the macOS app
+
+```bash
+packaging/macos/build.sh
+```
+
+On an Apple Silicon Mac, produces `dist/ScreenRec.app` (PyInstaller, signed ad
+hoc) and `dist/ScreenRec-<version>.dmg`. It bundles a pinned static FFmpeg
+build from [martin-riedl.de](https://ffmpeg.martin-riedl.de) (checked against
+its SHA256), which is GPL-licensed; its licence is shipped in the app's
+`Contents/Resources`.
 
 ## Development
 

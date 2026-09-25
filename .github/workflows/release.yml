@@ -1,9 +1,9 @@
 name: Release
 
-# Pushing a version tag (vX.Y.Z) builds the Linux Flatpak and publishes it as a
-# GitHub Release, with release notes taken from that version's CHANGELOG
-# section and SHA256 checksums. Run it by hand (Actions > Release > Run
-# workflow) to build the Flatpak without publishing anything.
+# Pushing a version tag (vX.Y.Z) builds the Linux Flatpak and the macOS .dmg
+# and publishes them as a GitHub Release, with release notes taken from that
+# version's CHANGELOG section and SHA256 checksums. Run it by hand (Actions >
+# Release > Run workflow) to build both without publishing anything.
 on:
   push:
     tags: ["v*"]
@@ -42,8 +42,35 @@ jobs:
           path: ScreenRec-*.flatpak
           if-no-files-found: error
 
+  macos:
+    needs: test
+    runs-on: macos-latest  # Apple Silicon, like the app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.14"
+      - name: Check the tag matches pyproject.toml
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -1)
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "tag $GITHUB_REF_NAME but pyproject.toml says $version"; exit 1; }
+      - run: packaging/macos/build.sh
+      # Smallest real-environment check: the built app starts and stays up.
+      - name: Launch the app
+        run: |
+          dist/ScreenRec.app/Contents/MacOS/ScreenRec &
+          sleep 15
+          kill -0 $! && kill $!
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/ScreenRec-*.dmg
+          if-no-files-found: error
+
   publish:
-    needs: flatpak
+    needs: [flatpak, macos]
     if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
@@ -53,6 +80,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: flatpak
+      - uses: actions/download-artifact@v8
+        with:
+          name: macos
       - name: Release notes from CHANGELOG.md
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -60,7 +90,7 @@ jobs:
             'index($0, heading) == 1 {found = 1; next} found && /^## / {exit} found' \
             CHANGELOG.md > notes.md
           test -s notes.md || { echo "no CHANGELOG section for $version"; exit 1; }
-      - run: sha256sum ScreenRec-*.flatpak > SHA256SUMS
+      - run: sha256sum ScreenRec-*.flatpak ScreenRec-*.dmg > SHA256SUMS
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,5 +99,5 @@ jobs:
           # x.y.0 has passed acceptance on real hardware; other patch versions
           # are test releases (see CHANGELOG), so mark them as pre-releases.
           prerelease=$([ "${version##*.}" = 0 ] || echo --prerelease)
-          gh release create "$GITHUB_REF_NAME" ScreenRec-*.flatpak SHA256SUMS \
+          gh release create "$GITHUB_REF_NAME" ScreenRec-*.flatpak ScreenRec-*.dmg SHA256SUMS \
             --title "ScreenRec $version" --notes-file notes.md $prerelease

@@ -13,12 +13,15 @@ ScreenRecorder runs on keep their own licences:
     platformdirs                          MIT
     tomli-w                               MIT
     PyAudioWPatch (Windows)               Apache-2.0
+    PyObjC (macOS)                        MIT
 
   Programs run as separate processes
     FFmpeg      LGPL-2.1+ or GPL-2.0+ depending on the build. The Windows
                 installer bundles a GPL build and ships its licence next to it
-                (ffmpeg\LICENSE.txt). On Linux the system's (or the Flatpak
-                runtime's) FFmpeg is used.
+                (ffmpeg\LICENSE.txt). The macOS app bundles a GPL-3.0 build
+                from https://ffmpeg.martin-riedl.de and ships its licence in
+                Contents/Resources/FFmpeg-LICENSE.txt. On Linux the system's
+                (or the Flatpak runtime's) FFmpeg is used.
     GStreamer   LGPL-2.1+ (Linux only; the system's or the Flatpak runtime's)
 
   Encoders reached through FFmpeg, when that FFmpeg build includes them
