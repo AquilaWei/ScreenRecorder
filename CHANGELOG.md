@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 - 2026-09-24
+
+- **Linux accepted** on real hardware (Fedora, KDE Plasma, Wayland). No code
+  changes since 0.1.2. New since 0.1.0:
+  - Full-screen recording with system audio through the desktop's
+    screen-sharing dialog; the screen choice is remembered between recordings
+  - Encoding on the graphics card (NVIDIA, Intel Quick Sync, or VAAPI on Intel
+    and AMD), falling back to x264 or OpenH264
+  - A Flatpak that installs the same way on any distribution
+  - Open source under Apache-2.0
+
 ## 0.1.2 - 2026-09-24
 
 - **New**: Linux records with the graphics card's own encoder (VAAPI) on Intel
