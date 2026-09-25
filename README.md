@@ -5,8 +5,7 @@ video quality, save location, and capture range (full screen, a window, or a cus
 region). A translucent red circle marks that recording is active — the circle itself
 is excluded from the recording.
 
-**Status: early development — Windows and Linux (full-screen recording), plus a
-macOS test version.** See
+**Status: early development — Windows, Linux and macOS (full-screen recording).** See
 [`CHANGELOG.md`](CHANGELOG.md) for what works today.
 
 ## What it does
@@ -41,7 +40,7 @@ macOS test version.** See
 - **Tray dot only**: Linux can't keep a window out of a screen capture, so the
   on-screen red circle isn't shown (it would be recorded)
 
-**Works now (macOS, test version - not yet accepted on real hardware):**
+**Works now (macOS):**
 
 - Records the **full screen** with **system audio** through Apple's
   **ScreenCaptureKit** (macOS 13+) — no extra audio driver needed; audio is
@@ -120,7 +119,7 @@ here rather than on Flathub.
 
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
 
-**macOS (test version)**
+**macOS**
 
 - macOS 13 Ventura or later on an **Apple Silicon** Mac (M1 or newer)
 - Nothing else: FFmpeg comes with the app
@@ -218,7 +217,7 @@ Unit tests run with no external dependencies. Integration tests that invoke a re
 ## Contributing
 
 Windows comes first (milestones M1–M4), then Linux (M5, full-screen recording
-already released) and macOS (M6, full-screen recording in testing). Each milestone lands as a `0.0.x` test release until it's
+already released) and macOS (M6, full-screen recording already released). Each milestone lands as a `0.0.x` test release until it's
 been verified on real hardware, then becomes a `0.x.0` release — see `CHANGELOG.md`.
 
 ## License
