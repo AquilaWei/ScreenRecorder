@@ -13,7 +13,7 @@ jobs:
       # Report every OS - a Linux failure shouldn't hide the Windows result.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         # Oldest and newest supported: clock behaviour differs across versions
         # (time.monotonic's resolution on Windows changed in 3.13).
         python: ["3.11", "3.14"]
@@ -31,6 +31,11 @@ jobs:
       - name: Install ffmpeg (for integration tests)
         if: runner.os == 'Windows'
         run: choco install ffmpeg -y
+      # The runner has no Screen Recording permission, so the macOS
+      # integration tests use a stand-in for ScreenCaptureKit.
+      - name: Install ffmpeg (for integration tests)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
       - run: uv sync
       - run: uv run ruff check
       - run: uv run ruff format --check
