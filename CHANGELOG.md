@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 - 2026-09-24
+
+- **New (test version)**: macOS. Records the full screen with system audio on
+  Apple Silicon Macs running macOS 13 or later, through Apple's ScreenCaptureKit
+  — no extra audio driver needed. The red circle is shown and kept out of the
+  recording (so is ScreenRec's own window), recording uses the Mac's hardware
+  encoder, and the Mac stays awake while recording. Comes as a `.dmg` with
+  FFmpeg bundled; it isn't signed with an Apple Developer ID yet, so the first
+  launch needs right-click → Open, and the first recording asks for the Screen
+  Recording permission — see the README
+- **Change**: recordings are saved to the system's own videos folder by default
+  (`~/Movies` on macOS, the XDG videos folder on Linux)
+
 ## 0.2.0 - 2026-09-24
 
 - **Linux accepted** on real hardware (Fedora, KDE Plasma, Wayland). No code
