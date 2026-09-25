@@ -13,9 +13,10 @@ from PySide6.QtWidgets import QWidget
 
 WDA_EXCLUDEFROMCAPTURE = 0x11
 
-# Only Windows lets a window opt out of screen capture. Elsewhere the circle
-# would end up in the recording, so it isn't shown at all (the tray dot stays).
-CAN_EXCLUDE_FROM_CAPTURE = sys.platform == "win32"
+# Windows lets a window opt out of screen capture, and the macOS backend leaves
+# this app's windows out of its capture. On Linux the circle would end up in
+# the recording, so it isn't shown at all (the tray dot stays).
+CAN_EXCLUDE_FROM_CAPTURE = sys.platform in ("win32", "darwin")
 
 _BLINK_DIM_FACTOR = 0.35
 
@@ -26,7 +27,8 @@ class RecordingIndicator(QWidget):
     On Windows 10 2004+ it asks the OS to exclude it from any screen capture
     (SetWindowDisplayAffinity), so it never appears in the recording. If that
     fails (older Windows, other platforms), `excluded_from_capture` stays False
-    and the caller should warn that the circle will be recorded.
+    and the caller should warn that the circle will be recorded. On macOS the
+    recording backend leaves it out instead (and warns itself if it can't).
 
     NOTE: the round shape comes from a window mask and the translucency from
     whole-window opacity - deliberately not WA_TranslucentBackground. That
@@ -50,6 +52,9 @@ class RecordingIndicator(QWidget):
         self.resize(diameter, diameter)
         self.setMask(QRegion(0, 0, diameter, diameter, QRegion.Ellipse))
         self.setWindowOpacity(opacity)
+        # macOS hides tool windows whenever another app is active - which is
+        # all the time while recording something else.
+        self.setAttribute(Qt.WA_MacAlwaysShowToolWindow)
 
         self._blink_timer = QTimer(self)
         self._blink_timer.timeout.connect(self._toggle_blink)
@@ -72,6 +77,8 @@ class RecordingIndicator(QWidget):
         self.setWindowOpacity(self._opacity * dim)
 
     def _exclude_from_capture(self) -> bool:
+        if sys.platform == "darwin":
+            return True  # the capture filter excludes the whole app, see MacBackend
         if sys.platform != "win32":
             return False
         hwnd = int(self.winId())

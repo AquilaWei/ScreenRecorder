@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from platformdirs import user_videos_dir
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
@@ -22,9 +23,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from screenrec.recorder.base import Backend
 from screenrec.recorder.controller import Event, RecordingController, State
 from screenrec.recorder.finalize import remux_to_mp4
 from screenrec.recorder.linux import LinuxBackend
+from screenrec.recorder.macos import MacBackend
 from screenrec.recorder.spec import (
     AudioSource,
     CaptureMode,
@@ -66,12 +69,20 @@ class _CallableWorker(QObject):
             self.finished.emit(result, "")
 
 
+def _platform_backend() -> Backend:
+    if sys.platform.startswith("linux"):
+        return LinuxBackend()
+    if sys.platform == "darwin":
+        return MacBackend()
+    return WindowsBackend()
+
+
 class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("ScreenRec")
 
-        self._backend = LinuxBackend() if sys.platform.startswith("linux") else WindowsBackend()
+        self._backend = _platform_backend()
         self._controller = RecordingController()
         self._indicator = RecordingIndicator()
         self._tray_icon = RecordingTrayIcon()
@@ -84,7 +95,7 @@ class MainWindow(QWidget):
             self._quality_combo.addItem(preset.value, preset)
         self._quality_combo.setCurrentIndex(list(QualityPreset).index(QualityPreset.STANDARD))
 
-        self._output_dir_edit = QLineEdit(str(Path.home() / "Videos"))
+        self._output_dir_edit = QLineEdit(user_videos_dir())
         browse_button = QPushButton("瀏覽…")
         browse_button.clicked.connect(self._browse_output_dir)
 
