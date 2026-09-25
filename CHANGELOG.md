@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 - 2026-09-25
+
+- **New**: the Windows installer (`ScreenRec-Setup-<version>.exe`) is now
+  published on every release, next to the Linux Flatpak and the macOS `.dmg`,
+  with FFmpeg 9.0.2 bundled. It isn't code-signed yet, so SmartScreen may ask
+  you to click **More info → Run anyway** — see the README
+
 ## 0.2.1 - 2026-09-24
 
 - **New (test version)**: macOS. Records the full screen with system audio on
