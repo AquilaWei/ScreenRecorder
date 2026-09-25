@@ -12,11 +12,53 @@ import sys
 import threading
 from collections.abc import Callable
 
-import CoreMedia
 import objc
-import Quartz
-import ScreenCaptureKit
+
+# Every pyobjc name is imported here, once, rather than looked up on the
+# framework module when used: the modules resolve names lazily, and two
+# threads resolving the same name for the first time can make one of them fail
+# with KeyError (found in testing: the capture callbacks and the writer
+# threads all start using them at once).
+from CoreMedia import (
+    CMAudioFormatDescriptionGetStreamBasicDescription,
+    CMBlockBufferCopyDataBytes,
+    CMBlockBufferGetDataLength,
+    CMClockGetHostTimeClock,
+    CMClockGetTime,
+    CMSampleBufferGetDataBuffer,
+    CMSampleBufferGetFormatDescription,
+    CMSampleBufferGetImageBuffer,
+    CMSampleBufferGetPresentationTimeStamp,
+    CMSampleBufferGetSampleAttachmentsArray,
+    CMTimeGetSeconds,
+    CMTimeMake,
+)
 from Foundation import NSObject
+from Quartz import (
+    CGDisplayCopyDisplayMode,
+    CGDisplayModeGetPixelHeight,
+    CGDisplayModeGetPixelWidth,
+    CGMainDisplayID,
+    CGPreflightScreenCaptureAccess,
+    CGRequestScreenCaptureAccess,
+    CVPixelBufferGetBaseAddressOfPlane,
+    CVPixelBufferGetBytesPerRowOfPlane,
+    CVPixelBufferLockBaseAddress,
+    CVPixelBufferUnlockBaseAddress,
+    kCGDisplayStreamYCbCrMatrix_ITU_R_709_2,
+    kCVPixelBufferLock_ReadOnly,
+    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+)
+from ScreenCaptureKit import (
+    SCContentFilter,
+    SCFrameStatusComplete,
+    SCShareableContent,
+    SCStream,
+    SCStreamConfiguration,
+    SCStreamFrameInfoStatus,
+    SCStreamOutputTypeAudio,
+    SCStreamOutputTypeScreen,
+)
 
 from screenrec.recorder.audio_sync import AUDIO_CHANNELS, AUDIO_SAMPLE_RATE
 from screenrec.recorder.macos import FrameLayout, frame_layout, interleave_f32, output_size
@@ -38,7 +80,7 @@ PERMISSION_DENIED_MESSAGE = (
 def host_clock() -> float:
     """Seconds on the host clock, the clock of every ScreenCaptureKit
     timestamp. Everything compared with those timestamps must use this."""
-    return CoreMedia.CMTimeGetSeconds(CoreMedia.CMClockGetTime(CoreMedia.CMClockGetHostTimeClock()))
+    return CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock()))
 
 
 def _wait_for(start: Callable[[Callable], None], what: str):
@@ -73,9 +115,9 @@ class _StreamOutput(NSObject, protocols=[objc.protocolNamed("SCStreamOutput")]):
 
     def stream_didOutputSampleBuffer_ofType_(self, stream, sample_buffer, output_type):
         try:
-            if output_type == ScreenCaptureKit.SCStreamOutputTypeScreen:
+            if output_type == SCStreamOutputTypeScreen:
                 self._capture._on_screen_buffer(sample_buffer)
-            elif output_type == ScreenCaptureKit.SCStreamOutputTypeAudio:
+            elif output_type == SCStreamOutputTypeAudio:
                 self._capture._on_audio_buffer(sample_buffer)
         except Exception as exc:  # noqa: BLE001 - an exception would kill SCK's queue
             if sys.stderr is not None:
@@ -112,13 +154,13 @@ class ScreenCapture:
         Raises PermissionError without the Screen Recording permission (and
         makes macOS show its prompt), RuntimeError on other failures.
         """
-        if not Quartz.CGPreflightScreenCaptureAccess():
-            Quartz.CGRequestScreenCaptureAccess()
+        if not CGPreflightScreenCaptureAccess():
+            CGRequestScreenCaptureAccess()
             raise PermissionError(PERMISSION_DENIED_MESSAGE)
 
         content = _wait_for(
             lambda handler: (
-                ScreenCaptureKit.SCShareableContent.getShareableContentExcludingDesktopWindows_onScreenWindowsOnly_completionHandler_(  # noqa: E501
+                SCShareableContent.getShareableContentExcludingDesktopWindows_onScreenWindowsOnly_completionHandler_(  # noqa: E501
                     False, False, handler
                 )
             ),
@@ -126,24 +168,26 @@ class ScreenCapture:
         )
         display = self._pick_display(content.displays(), display_index)
         own_app = [app for app in content.applications() if app.processID() == os.getpid()]
-        content_filter = ScreenCaptureKit.SCContentFilter.alloc().initWithDisplay_excludingApplications_exceptingWindows_(  # noqa: E501
-            display, own_app, []
+        content_filter = (
+            SCContentFilter.alloc().initWithDisplay_excludingApplications_exceptingWindows_(  # noqa: E501
+                display, own_app, []
+            )
         )
 
-        mode = Quartz.CGDisplayCopyDisplayMode(display.displayID())
+        mode = CGDisplayCopyDisplayMode(display.displayID())
         width, height = output_size(
-            Quartz.CGDisplayModeGetPixelWidth(mode),
-            Quartz.CGDisplayModeGetPixelHeight(mode),
+            CGDisplayModeGetPixelWidth(mode),
+            CGDisplayModeGetPixelHeight(mode),
             scale_height,
         )
         self._frame_width, self._frame_height = width, height
-        self._stream = ScreenCaptureKit.SCStream.alloc().initWithFilter_configuration_delegate_(
+        self._stream = SCStream.alloc().initWithFilter_configuration_delegate_(
             content_filter, self._configuration(width, height, fps), None
         )
         self._output = _StreamOutput.alloc().initWithCapture_(self)
-        self._add_output(ScreenCaptureKit.SCStreamOutputTypeScreen)
+        self._add_output(SCStreamOutputTypeScreen)
         if self._on_audio is not None:
-            self._add_output(ScreenCaptureKit.SCStreamOutputTypeAudio)
+            self._add_output(SCStreamOutputTypeAudio)
         _wait_for(self._stream.startCaptureWithCompletionHandler_, "開始擷取")
         return bool(own_app)
 
@@ -160,12 +204,12 @@ class ScreenCapture:
                 print(f"[screencapture] {exc}", file=sys.stderr)
 
     def _configuration(self, width: int, height: int, fps: int):
-        config = ScreenCaptureKit.SCStreamConfiguration.alloc().init()
+        config = SCStreamConfiguration.alloc().init()
         config.setWidth_(width)
         config.setHeight_(height)
-        config.setMinimumFrameInterval_(CoreMedia.CMTimeMake(1, fps))
-        config.setPixelFormat_(Quartz.kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
-        config.setColorMatrix_(Quartz.kCGDisplayStreamYCbCrMatrix_ITU_R_709_2)
+        config.setMinimumFrameInterval_(CMTimeMake(1, fps))
+        config.setPixelFormat_(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+        config.setColorMatrix_(kCGDisplayStreamYCbCrMatrix_ITU_R_709_2)
         config.setShowsCursor_(True)
         config.setQueueDepth_(_QUEUE_DEPTH)
         if self._on_audio is not None:
@@ -186,55 +230,51 @@ class ScreenCapture:
     def _pick_display(displays, index: int):
         """Index 0 is the main display (the one with the menu bar), the rest
         follow in ScreenCaptureKit's order."""
-        main_id = Quartz.CGMainDisplayID()
+        main_id = CGMainDisplayID()
         ordered = sorted(displays, key=lambda display: display.displayID() != main_id)
         if not 0 <= index < len(ordered):
             raise RuntimeError(f"找不到第 {index + 1} 個螢幕")
         return ordered[index]
 
     def _on_screen_buffer(self, sample_buffer) -> None:
-        attachments = CoreMedia.CMSampleBufferGetSampleAttachmentsArray(sample_buffer, False)
+        attachments = CMSampleBufferGetSampleAttachmentsArray(sample_buffer, False)
         if not attachments:
             return
-        status = attachments[0].get(ScreenCaptureKit.SCStreamFrameInfoStatus)
-        if status != ScreenCaptureKit.SCFrameStatusComplete:
+        status = attachments[0].get(SCStreamFrameInfoStatus)
+        if status != SCFrameStatusComplete:
             return  # idle/blank/suspended frames carry no new image
-        pixels = CoreMedia.CMSampleBufferGetImageBuffer(sample_buffer)
-        presented_at = CoreMedia.CMTimeGetSeconds(
-            CoreMedia.CMSampleBufferGetPresentationTimeStamp(sample_buffer)
-        )
-        Quartz.CVPixelBufferLockBaseAddress(pixels, Quartz.kCVPixelBufferLock_ReadOnly)
+        pixels = CMSampleBufferGetImageBuffer(sample_buffer)
+        presented_at = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample_buffer))
+        CVPixelBufferLockBaseAddress(pixels, kCVPixelBufferLock_ReadOnly)
         try:
-            luma_row = Quartz.CVPixelBufferGetBytesPerRowOfPlane(pixels, 0)
-            chroma_row = Quartz.CVPixelBufferGetBytesPerRowOfPlane(pixels, 1)
+            luma_row = CVPixelBufferGetBytesPerRowOfPlane(pixels, 0)
+            chroma_row = CVPixelBufferGetBytesPerRowOfPlane(pixels, 1)
             layout = frame_layout(self._frame_width, self._frame_height, luma_row, chroma_row)
-            luma = Quartz.CVPixelBufferGetBaseAddressOfPlane(pixels, 0)
-            chroma = Quartz.CVPixelBufferGetBaseAddressOfPlane(pixels, 1)
+            luma = CVPixelBufferGetBaseAddressOfPlane(pixels, 0)
+            chroma = CVPixelBufferGetBaseAddressOfPlane(pixels, 1)
             # Copied out: SCK reuses the buffer once this callback returns.
             data = bytes(luma.as_buffer(luma_row * layout.height)) + bytes(
                 chroma.as_buffer(chroma_row * layout.height // 2)
             )
         finally:
-            Quartz.CVPixelBufferUnlockBaseAddress(pixels, Quartz.kCVPixelBufferLock_ReadOnly)
+            CVPixelBufferUnlockBaseAddress(pixels, kCVPixelBufferLock_ReadOnly)
         self._on_video(presented_at, layout, data)
 
     def _on_audio_buffer(self, sample_buffer) -> None:
-        block = CoreMedia.CMSampleBufferGetDataBuffer(sample_buffer)
+        block = CMSampleBufferGetDataBuffer(sample_buffer)
         if block is None:
             return
-        length = CoreMedia.CMBlockBufferGetDataLength(block)
-        status, data = CoreMedia.CMBlockBufferCopyDataBytes(block, 0, length, None)
+        length = CMBlockBufferGetDataLength(block)
+        status, data = CMBlockBufferCopyDataBytes(block, 0, length, None)
         if status != 0:
             raise RuntimeError(f"CMBlockBufferCopyDataBytes failed: {status}")
-        description = CoreMedia.CMAudioFormatDescriptionGetStreamBasicDescription(
-            CoreMedia.CMSampleBufferGetFormatDescription(sample_buffer)
+        description = CMAudioFormatDescriptionGetStreamBasicDescription(
+            CMSampleBufferGetFormatDescription(sample_buffer)
         )
         data = bytes(data)
         if description.mFormatFlags & _kAudioFormatFlagIsNonInterleaved:
             # One buffer per channel, stored one after the other.
             half = len(data) // 2
             data = interleave_f32(data[:half], data[half:])
-        presented_at = CoreMedia.CMTimeGetSeconds(
-            CoreMedia.CMSampleBufferGetPresentationTimeStamp(sample_buffer)
-        )
+        presented_at = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample_buffer))
         self._on_audio(presented_at, data)
