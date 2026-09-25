@@ -186,7 +186,9 @@ class MainWindow(QWidget):
         if CAN_EXCLUDE_FROM_CAPTURE:
             primary_screen = QGuiApplication.primaryScreen()
             if primary_screen is not None:
-                geometry = primary_screen.geometry()
+                # Available, not full, geometry: the macOS menu bar sits
+                # above always-on-top windows and would hide the circle.
+                geometry = primary_screen.availableGeometry()
                 self._indicator.move(geometry.right() - 40, geometry.top() + 16)
             self._indicator.show()
         self._tray_icon.show()
